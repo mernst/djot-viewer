@@ -109,6 +109,21 @@ describe("render", () => {
     });
   }
 
+  test("build returns a rendering without changing the page", async () => {
+    const window = plainTextWindow("text");
+    const before = window.document.documentElement.outerHTML;
+    const rendering = await window.djotViewer.build(
+      window.document,
+      "# Title\n\n# Two\n\n# Three\n",
+      { fileName: "f.djot", load },
+    );
+    assert.equal(window.document.documentElement.outerHTML, before);
+    assert.equal(rendering.title, "Title");
+    // Array.from makes an array of this realm, not of jsdom's window.
+    assert.deepEqual(Array.from(rendering.nodes, (n) => n.className), ["toc", "djot"]);
+    assert.equal(rendering.nodes[1], rendering.main);
+  });
+
   test("leaves the page unchanged if the parser fails", async () => {
     const window = plainTextWindow("text");
     const before = window.document.documentElement.outerHTML;

@@ -54,31 +54,51 @@
     }
   }
 
+  /** The number of diagrams rendered so far, which makes each id unique. */
+  let diagramCount = 0;
+
+  /** A promise of the initialized Mermaid module, or null before it is needed. */
+  let mermaidPromise = null;
+
   /**
-   * Replace each Mermaid code block in the document by the diagram that it
-   * describes.  Load Mermaid only if there is a Mermaid block.  If a diagram
-   * cannot be rendered, keep its code block and add an error message after
-   * it.
+   * Return a promise of the Mermaid module, loaded and initialized the first
+   * time that this function is called.
+   *
+   * @returns {Promise<object>} a promise of the Mermaid module
    */
-  async function renderDiagrams() {
-    const blocks = document.querySelectorAll("main.djot pre > code.language-mermaid");
+  function loadMermaid() {
+    mermaidPromise ??= load("vendor/mermaid/mermaid.esm.min.mjs").then(({ default: mermaid }) => {
+      mermaid.initialize({
+        startOnLoad: false,
+        // "strict" encodes HTML in labels and disables click handlers.
+        securityLevel: "strict",
+        theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default",
+      });
+      return mermaid;
+    });
+    return mermaidPromise;
+  }
+
+  /**
+   * Replace each Mermaid code block in the given element by the diagram that
+   * it describes.  The element need not be in the document.  Load Mermaid
+   * only if there is a Mermaid block.  If a diagram cannot be rendered, keep
+   * its code block and add an error message after it.
+   *
+   * @param {Element} main - an element that holds a rendered document
+   */
+  async function renderDiagrams(main) {
+    const blocks = main.querySelectorAll("pre > code.language-mermaid");
     if (blocks.length === 0) {
       return;
     }
     let mermaid;
     try {
-      mermaid = (await load("vendor/mermaid/mermaid.esm.min.mjs")).default;
+      mermaid = await loadMermaid();
     } catch (error) {
       console.error("djot-viewer: loading Mermaid failed:", error);
       return;
     }
-    mermaid.initialize({
-      startOnLoad: false,
-      // "strict" encodes HTML in labels and disables click handlers.
-      securityLevel: "strict",
-      theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default",
-    });
-    let count = 0;
     for (const code of blocks) {
       const pre = code.parentElement;
       const source = code.textContent;
@@ -86,7 +106,9 @@
         // `parse` reports a syntax error without leaving an error diagram in
         // the document, as `render` can.
         await mermaid.parse(source);
-        const { svg } = await mermaid.render(`djot-viewer-diagram-${++count}`, source);
+        // Each id is new, because Mermaid removes any element that already
+        // has the id, such as a diagram that the page still shows.
+        const { svg } = await mermaid.render(`djot-viewer-diagram-${++diagramCount}`, source);
         const diagram = document.createElement("div");
         diagram.className = "diagram";
         diagram.innerHTML = svg;
@@ -101,28 +123,60 @@
   }
 
   /**
-   * Replace the page's body by the rendering of the given Djot source text,
-   * including its diagrams, and keep the page's scroll position.  If the
-   * Djot parser fails, log the error to the console and leave the page
-   * unchanged.
+   * Return the rendering of the given Djot source text, as
+   * `djotViewer.build` does, or null if the Djot parser fails.  In that case,
+   * log the error to the console.
    *
    * @param {string} source - Djot source text
-   * @returns {Promise<boolean>} a promise of true if the page was rendered
+   * @returns {Promise<object|null>} a promise of the rendering, or of null
    */
-  async function renderPage(source) {
-    const { scrollX, scrollY } = window;
+  async function build(source) {
     try {
-      await djotViewer.render(document, source, { fileName: fileName(), load });
+      return await djotViewer.build(document, source, { fileName: fileName(), load });
     } catch (error) {
       console.error("djot-viewer: rendering failed:", error);
-      return false;
+      return null;
     }
+  }
+
+  /**
+   * Scroll to the element that the URL's fragment names, as in
+   * "notes.djot#Results".  The browser looked for it before the page was
+   * rendered, when the plain text had no such element.
+   */
+  function scrollToFragment() {
+    const fragment = location.hash.slice(1);
+    if (!fragment) {
+      return;
+    }
+    let id;
+    try {
+      id = decodeURIComponent(fragment);
+    } catch {
+      // The fragment is not valid percent-encoded UTF-8.
+      id = fragment;
+    }
+    document.getElementById(id)?.scrollIntoView();
+  }
+
+  /**
+   * Replace the page's body by the rendering of the given Djot source text,
+   * at the page's current scroll position.  The page changes only once, when
+   * the rendering is complete, including its diagrams.  If the Djot parser
+   * fails, log the error to the console and leave the page unchanged.
+   *
+   * @param {string} source - Djot source text
+   */
+  async function rerender(source) {
+    const rendering = await build(source);
+    if (!rendering) {
+      return;
+    }
+    await renderDiagrams(rendering.main);
+    const { scrollX, scrollY } = window;
+    djotViewer.show(document, rendering);
     fitTocToWindow();
     window.scrollTo(scrollX, scrollY);
-    await renderDiagrams();
-    // Diagrams change the height of the content above the scroll position.
-    window.scrollTo(scrollX, scrollY);
-    return true;
   }
 
   /**
@@ -138,46 +192,55 @@
   }
 
   /**
-   * Return the current contents of the page's file, read again.  Decode it
-   * as UTF-8, or as windows-1252 if it is not valid UTF-8, and convert each
-   * line ending to "\n", as Chrome's plain-text page does.
+   * Return the current contents of the page's file, as bytes.
    *
-   * @returns {Promise<string|null>} a promise of the file's text, or of null
-   *     if the server responded with an error status, such as 404 for a
+   * @returns {Promise<Uint8Array|null>} a promise of the file's bytes, or of
+   *     null if the server responded with an error status, such as 404 for a
    *     deleted file
    * @throws {Error} if the file cannot be read at all
    */
-  async function fetchSource() {
+  async function fetchBytes() {
     if (location.protocol === "file:") {
       // Chrome blocks a fetch from a file:// page, so background.js reads the
-      // file.  It decodes the text the same way as below.
+      // file.  It sends the bytes as a string of characters U+0000-U+00FF.
       const reply = await chrome.runtime.sendMessage({ type: "read-file" });
       if (reply.error !== undefined) {
         throw new Error(reply.error);
       }
-      return reply.text;
+      return Uint8Array.from(reply.bytes, (c) => c.charCodeAt(0));
     }
     const response = await fetch(location.href, { cache: "no-store" });
-    if (!response.ok) {
-      return null;
-    }
-    const bytes = await response.arrayBuffer();
-    let text;
+    return response.ok ? new Uint8Array(await response.arrayBuffer()) : null;
+  }
+
+  /**
+   * Return the text of the given bytes of the page's file, decoded as Chrome
+   * decoded the page when it loaded:  with the page's encoding, repaired as
+   * the initial rendering repairs it, and with each line ending converted to
+   * "\n", as Chrome's plain-text page does.
+   *
+   * @param {Uint8Array} bytes - a version of the page's file
+   * @returns {string} the file's text
+   */
+  function decode(bytes) {
+    let decoder;
     try {
-      text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      decoder = new TextDecoder(document.characterSet);
     } catch {
-      text = new TextDecoder("windows-1252").decode(bytes);
+      // TextDecoder does not support the page's encoding.
+      decoder = new TextDecoder();
     }
-    return text.replace(/\r\n?/g, "\n");
+    const text = decoder.decode(bytes).replace(/\r\n?/g, "\n");
+    return djotViewer.repairEncoding(text, document.characterSet);
   }
 
   /**
    * Check the page's file for changes every RELOAD_INTERVAL_MS while the tab
    * is visible, and render the page again when the file changes.  If the
-   * first check cannot fetch the file, log the error to the console and stop
+   * first check cannot read the file, log the error to the console and stop
    * checking.  Later failures, as when a local server restarts, are ignored.
    *
-   * @param {string} source - the Djot source text that the page shows now
+   * @param {string} source - a Djot source text, which the page shows now
    */
   async function watchForChanges(source) {
     let shown = source;
@@ -187,9 +250,9 @@
       if (document.visibilityState !== "visible") {
         continue;
       }
-      let current;
+      let bytes;
       try {
-        current = await fetchSource();
+        bytes = await fetchBytes();
       } catch (error) {
         if (!fetched) {
           console.error("djot-viewer: automatic reloading is unavailable:", error);
@@ -198,11 +261,12 @@
         continue;
       }
       fetched = true;
+      const current = bytes === null ? null : decode(bytes);
       if (current !== null && current !== shown) {
         // If the parser fails, the page keeps its previous rendering.  Do not
         // try that text again until the file changes again.
         shown = current;
-        await renderPage(current);
+        await rerender(current);
       }
     }
   }
@@ -219,11 +283,19 @@
       return;
     }
     const source = djotViewer.repairEncoding(pre.textContent, document.characterSet);
-    // If rendering fails, the page still shows the plain text.
-    if (!(await renderPage(source))) {
+    const rendering = await build(source);
+    if (!rendering) {
+      // The page still shows the plain text.
       return;
     }
+    // Show the page before rendering diagrams, because Mermaid is slow to
+    // load.  As each diagram appears, Chrome's scroll anchoring keeps the
+    // visible text in place.
+    djotViewer.show(document, rendering);
+    fitTocToWindow();
+    scrollToFragment();
     wideWindow.addEventListener("change", fitTocToWindow);
+    await renderDiagrams(rendering.main);
     if (isLocal()) {
       await watchForChanges(source);
     }

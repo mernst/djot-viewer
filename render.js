@@ -72,17 +72,28 @@ globalThis.djotViewer = (() => {
   }
 
   /**
-   * Replace the body of the given document by the rendering of the given Djot
-   * source text.  The rendering is sanitized, and it includes rendered math,
-   * syntax highlighting, and a table of contents.  Also set the document's
-   * title.  Mermaid diagrams are left as code blocks.
+   * A rendered Djot document that is not yet in a page.
    *
-   * If the Djot parser fails, throw before changing the document.  If math,
-   * highlighting, or the table of contents fails, log the error to the console
-   * and render the document without that feature.
+   * @typedef {object} Rendering
+   * @property {string} title - the document's title, such as "My notes"
+   * @property {Element} main - the `<main class="djot">` element that holds
+   *     the rendered document
+   * @property {Element[]} nodes - the elements that become the page's body:
+   *     the table of contents (if there is one) and `main`
+   */
+
+  /**
+   * Return the rendering of the given Djot source text, without changing the
+   * given document.  The rendering is sanitized, and it includes rendered
+   * math, syntax highlighting, and a table of contents.  Mermaid diagrams are
+   * left as code blocks.
    *
-   * @param {Document} document - a document, such as Chrome's page for a
-   *     plain-text file
+   * If the Djot parser fails, throw.  If math, highlighting, or the table of
+   * contents fails, log the error to the console and return a rendering
+   * without that feature.
+   *
+   * @param {Document} document - a document, which creates the rendering's
+   *     elements
    * @param {string} source - Djot source text
    * @param {object} options - options
    * @param {string} options.fileName - the title to use if the source has no
@@ -91,22 +102,54 @@ globalThis.djotViewer = (() => {
    *     takes the path of an ES module relative to the extension's root
    *     directory, such as "vendor/temml/temml.mjs", and returns a promise of
    *     the module
-   * @returns {Promise<void>} a promise that resolves when rendering is done
+   * @returns {Promise<Rendering>} a promise of the rendering
    */
-  async function render(document, source, { fileName, load }) {
+  async function build(document, source, { fileName, load }) {
     const html = djot.renderHTML(djot.parse(source));
     const main = document.createElement("main");
     main.className = "djot";
     main.innerHTML = DOMPurify.sanitize(html);
-    document.documentElement.classList.add("djot-viewer");
-    document.body.replaceChildren(main);
 
     const h1 = main.querySelector("h1");
-    document.title = (h1 && titleText(h1)) || fileName;
+    const title = (h1 && titleText(h1)) || fileName;
 
     await step("math rendering", () => renderMath(main, load));
     await step("syntax highlighting", () => highlightCode(main, load));
-    await step("the table of contents", () => buildToc(document, main));
+    let toc = null;
+    await step("the table of contents", () => {
+      toc = buildToc(document, main);
+    });
+    return { title, main, nodes: toc ? [toc, main] : [main] };
+  }
+
+  /**
+   * Replace the body of the given document by the given rendering, and set
+   * the document's title.
+   *
+   * @param {Document} document - a document, such as Chrome's page for a
+   *     plain-text file
+   * @param {Rendering} rendering - a rendering that `build` returned for
+   *     `document`
+   */
+  function show(document, rendering) {
+    document.documentElement.classList.add("djot-viewer");
+    document.title = rendering.title;
+    document.body.replaceChildren(...rendering.nodes);
+  }
+
+  /**
+   * Replace the body of the given document by the rendering of the given Djot
+   * source text, and set the document's title.  This is `build` followed by
+   * `show`.  If the Djot parser fails, throw before changing the document.
+   *
+   * @param {Document} document - a document, such as Chrome's page for a
+   *     plain-text file
+   * @param {string} source - Djot source text
+   * @param {object} options - options, as for `build`
+   * @returns {Promise<void>} a promise that resolves when rendering is done
+   */
+  async function render(document, source, options) {
+    show(document, await build(document, source, options));
   }
 
   /**
@@ -233,18 +276,21 @@ globalThis.djotViewer = (() => {
   }
 
   /**
-   * Insert a table of contents before the given element, if the element has
-   * at least TOC_MIN_HEADINGS headings of levels 1-3.  The table of contents
-   * is a `<nav class="toc">` that holds a `<details>`, which is closed.
+   * Return a table of contents for the given element, if the element has at
+   * least TOC_MIN_HEADINGS headings of levels 1-3.  The table of contents is
+   * a `<nav class="toc">` that holds a `<details>`, which is closed.
    *
-   * @param {Document} document - the document that holds `main`
-   * @param {Element} main - the element that holds the rendered document,
-   *     after math rendering
+   * @param {Document} document - the document that creates the table of
+   *     contents
+   * @param {Element} main - an element that holds a rendered document, after
+   *     math rendering
+   * @returns {Element|null} the table of contents, or null if `main` has too
+   *     few headings
    */
   function buildToc(document, main) {
     const headings = main.querySelectorAll("h1, h2, h3");
     if (headings.length < TOC_MIN_HEADINGS) {
-      return;
+      return null;
     }
     const levels = [...headings].map((h) => Number(h.tagName[1]));
 
@@ -281,7 +327,7 @@ globalThis.djotViewer = (() => {
     nav.className = "toc";
     nav.setAttribute("aria-label", "Table of contents");
     nav.append(details);
-    main.before(nav);
+    return nav;
   }
 
   /**
@@ -320,5 +366,5 @@ globalThis.djotViewer = (() => {
     return item;
   }
 
-  return { repairEncoding, render };
+  return { repairEncoding, build, show, render };
 })();
