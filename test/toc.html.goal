@@ -1,0 +1,34 @@
+<html class="djot-viewer"><head><meta name="color-scheme" content="light dark"><title>Table of contents</title></head><body><nav class="toc" aria-label="Table of contents"><details><summary>Contents</summary><ul><li><ul><li><a href="#A-level-2-heading-before-any-level-1-heading">A level-2 heading before any level-1 heading</a></li></ul></li><li><a href="#Table-of-contents">Table of contents</a><ul><li><a href="#A-heading-with-a-footnote1-and-a-link">A heading with a footnote and a link</a><ul><li><a href="#Third-level">Third level</a></li></ul></li><li><a href="#custom-id">A heading with an explicit identifier</a></li><li><a href="#title">title</a></li></ul></li><li><a href="#Second-level-1-heading">Second level-1 heading</a></li></ul></details></nav><main class="djot"><section id="A-level-2-heading-before-any-level-1-heading">
+<h2>A level-2 heading before any level-1 heading</h2>
+</section>
+<section id="Table-of-contents">
+<h1>Table of contents</h1>
+<section id="A-heading-with-a-footnote1-and-a-link">
+<h2>A heading with a footnote<a id="fnref1" href="#fn1" role="doc-noteref"><sup>1</sup></a> and a <a href="https://djot.net/">link</a></h2>
+<section id="Third-level">
+<h3>Third level</h3>
+<section id="Fourth-level-which-the-table-of-contents-omits">
+<h4>Fourth level, which the table of contents omits</h4>
+</section>
+</section>
+</section>
+<section id="custom-id">
+<h2>A heading with an explicit identifier</h2>
+</section>
+<section id="title">
+<h2>title</h2>
+<p>A heading whose identifier (“title”) is also a property of <code>document</code>.</p>
+</section>
+</section>
+<section id="Second-level-1-heading">
+<h1>Second level-1 heading</h1>
+</section>
+<section role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn1">
+<p>A footnote.<a href="#fnref1" role="doc-backlink">↩︎</a></p>
+</li>
+</ol>
+</section>
+</main></body></html>

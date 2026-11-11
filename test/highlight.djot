@@ -1,0 +1,26 @@
+# Highlighting
+
+A known language:
+
+``` python
+def greet(name):
+    return f"Hello, {name} <&>"
+```
+
+An unknown language:
+
+``` nosuchlang
+some <code> & text
+```
+
+No language:
+
+```
+plain <code> & text
+```
+
+A Mermaid block, which render.js leaves for content.js:
+
+``` mermaid
+graph TD; A-->B
+```

@@ -1,0 +1,23 @@
+<html class="djot-viewer"><head><meta name="color-scheme" content="light dark"><title>Diagrams</title></head><body><main class="djot"><section id="Diagrams">
+<h1>Diagrams</h1>
+<p>A flowchart:</p>
+<pre><code class="language-mermaid">graph LR
+  A[Start] --&gt; B{Choice}
+  B --&gt;|yes| C[One]
+  B --&gt;|no| D[Other]
+</code></pre>
+<p>A sequence diagram:</p>
+<pre><code class="language-mermaid">sequenceDiagram
+  Alice-&gt;&gt;Bob: Hello
+  Bob--&gt;&gt;Alice: Hi
+</code></pre>
+<p>A diagram with a syntax error:</p>
+<pre><code class="language-mermaid">graph LR
+  A --&gt;
+</code></pre>
+<p>A diagram whose label contains HTML, whose onerror handler must not run:</p>
+<pre><code class="language-mermaid">graph LR
+  A["&lt;img src=x onerror=alert(1)&gt;"] --&gt; B
+</code></pre>
+</section>
+</main></body></html>

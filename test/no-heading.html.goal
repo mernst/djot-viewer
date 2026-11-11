@@ -1,0 +1,10 @@
+<html class="djot-viewer"><head><meta name="color-scheme" content="light dark"><title>no-heading.djot</title></head><body><main class="djot"><p>This document has no level-1 heading, so its title is the file name.</p>
+<section id="Only-two-headings">
+<h2>Only two headings</h2>
+<p>So it has no table of contents.</p>
+</section>
+<section id="Second-heading">
+<h2>Second heading</h2>
+<p>Text.</p>
+</section>
+</main></body></html>

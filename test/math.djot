@@ -1,0 +1,15 @@
+# Math $`e^{i\pi}`
+
+Inline math: $`x^2 + y^2 = z^2`.  Display math:
+
+$$`\int_0^1 f(x)\,dx = \frac{1}{2}`
+
+## Errors
+
+Invalid TeX: $`\frac{1}{`.
+
+A link that `trust: false` must disable: $`\href{javascript:alert(1)}{x}`.
+
+## No math here
+
+Text.

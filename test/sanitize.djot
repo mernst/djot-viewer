@@ -1,0 +1,15 @@
+# Sanitizing
+
+An inline image with an event handler: `<img src=x onerror=alert(1)>`{=html}
+
+A [javascript: link](javascript:alert(2)).
+
+``` =html
+<script>alert(3)</script>
+<p onclick="alert(4)">A raw paragraph with an onclick attribute.</p>
+<a href="javascript:alert(5)">A raw javascript: link.</a>
+<img id="title" name="title" src="x"><form name="cookie"></form>
+<section id="cookie">A raw section whose id is kept.</section>
+```
+
+Harmless raw HTML is kept: `<kbd>Ctrl</kbd>`{=html}.

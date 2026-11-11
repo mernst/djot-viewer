@@ -1,0 +1,12 @@
+<html class="djot-viewer"><head><meta name="color-scheme" content="light dark"><title>Sanitizing</title></head><body><main class="djot"><section id="Sanitizing">
+<h1>Sanitizing</h1>
+<p>An inline image with an event handler: <img src="x"></p>
+<p>A <a>javascript: link</a>.</p>
+
+<p>A raw paragraph with an onclick attribute.</p>
+<a>A raw javascript: link.</a>
+<img src="x"><form></form>
+<section id="cookie">A raw section whose id is kept.</section>
+<p>Harmless raw HTML is kept: <kbd>Ctrl</kbd>.</p>
+</section>
+</main></body></html>

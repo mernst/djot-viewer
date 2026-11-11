@@ -1,0 +1,61 @@
+<html class="djot-viewer"><head><meta name="color-scheme" content="light dark"><title>Basic document</title></head><body><nav class="toc" aria-label="Table of contents"><details><summary>Contents</summary><ul><li><a href="#Basic-documenttitle">Basic document</a><ul><li><a href="#Lists-and-quotes">Lists and quotes</a></li><li><a href="#Tables">Tables</a><ul><li><a href="#A-third-level-heading">A third-level heading</a></li></ul></li></ul></li></ul></details></nav><main class="djot"><section id="Basic-documenttitle">
+<h1>Basic document<a id="fnref1" href="#fn1" role="doc-noteref"><sup>1</sup></a></h1>
+<p>This paragraph has <em>emphasis</em>, <strong>strong text</strong>, <code>inline code</code>, a
+<a href="other.djot">relative link</a>, an <a href="https://djot.net/">absolute link</a>, and a
+footnote.<a id="fnref2" href="#fn2" role="doc-noteref"><sup>2</sup></a></p>
+<section id="Lists-and-quotes">
+<h2>Lists and quotes</h2>
+<ul>
+<li>
+One
+</li>
+<li>
+Two
+<ol>
+<li>
+Nested
+</li>
+<li>
+List
+</li>
+</ol>
+</li>
+</ul>
+<blockquote>
+<p>A block quote.</p>
+</blockquote>
+</section>
+<section id="Tables">
+<h2>Tables</h2>
+<table>
+<tbody><tr>
+<th>Name</th>
+<th style="text-align: right;">Value</th>
+</tr>
+<tr>
+<td>alpha</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td>beta</td>
+<td style="text-align: right;">22</td>
+</tr>
+</tbody></table>
+<section id="A-third-level-heading">
+<h3>A third-level heading</h3>
+<p>Text.</p>
+</section>
+</section>
+</section>
+<section role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn1">
+<p>A footnote in the title, which the tab title omits.<a href="#fnref1" role="doc-backlink">↩︎</a></p>
+</li>
+<li id="fn2">
+<p>The footnote’s text.<a href="#fnref2" role="doc-backlink">↩︎</a></p>
+</li>
+</ol>
+</section>
+</main></body></html>

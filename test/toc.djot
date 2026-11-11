@@ -1,0 +1,20 @@
+## A level-2 heading before any level-1 heading
+
+# Table of contents
+
+## A heading with a footnote[^1] and a [link](https://djot.net/)
+
+### Third level
+
+#### Fourth level, which the table of contents omits
+
+{#custom-id}
+## A heading with an explicit identifier
+
+## title
+
+A heading whose identifier ("title") is also a property of `document`.
+
+# Second level-1 heading
+
+[^1]: A footnote.

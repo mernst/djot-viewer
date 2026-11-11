@@ -1,0 +1,12 @@
+{
+  "name": "djot-viewer",
+  "private": true,
+  "description": "Tests for the Djot viewer Chrome extension.  The extension itself does not use npm.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "29.1.1"
+  }
+}
