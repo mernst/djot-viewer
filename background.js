@@ -10,7 +10,8 @@
  * Return the given bytes as a string with one character per byte, U+0000 to
  * U+00FF.  Extension messages are JSON, which cannot hold bytes directly.
  *
- * @param {ArrayBuffer} buffer - bytes, such as the contents of a file
+ * @param {ArrayBuffer} buffer - a sequence of bytes, such as the contents of
+ *     a file
  * @returns {string} the bytes as characters
  */
 function byteString(buffer) {

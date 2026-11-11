@@ -57,26 +57,37 @@
   /** The number of diagrams rendered so far, which makes each id unique. */
   let diagramCount = 0;
 
-  /** A promise of the initialized Mermaid module, or null before it is needed. */
+  /**
+   * A promise of the Mermaid module, or null if it has not been loaded or if
+   * loading it failed.
+   */
   let mermaidPromise = null;
 
   /**
-   * Return a promise of the Mermaid module, loaded and initialized the first
-   * time that this function is called.
+   * Return the Mermaid module, initialized for the current color scheme.
+   * Load it the first time, and again after a failure to load it.
    *
    * @returns {Promise<object>} a promise of the Mermaid module
    */
-  function loadMermaid() {
-    mermaidPromise ??= load("vendor/mermaid/mermaid.esm.min.mjs").then(({ default: mermaid }) => {
-      mermaid.initialize({
-        startOnLoad: false,
-        // "strict" encodes HTML in labels and disables click handlers.
-        securityLevel: "strict",
-        theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default",
-      });
-      return mermaid;
+  async function loadMermaid() {
+    mermaidPromise ??= load("vendor/mermaid/mermaid.esm.min.mjs");
+    let mermaid;
+    try {
+      mermaid = (await mermaidPromise).default;
+    } catch (error) {
+      // Try again next time, as when the page is rendered again.
+      mermaidPromise = null;
+      throw error;
+    }
+    // Initialize on every call, so that diagrams follow a change of color
+    // scheme, as the rest of the page does.
+    mermaid.initialize({
+      startOnLoad: false,
+      // "strict" encodes HTML in labels and disables click handlers.
+      securityLevel: "strict",
+      theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default",
     });
-    return mermaidPromise;
+    return mermaid;
   }
 
   /**
@@ -127,7 +138,7 @@
    * `djotViewer.build` does, or null if the Djot parser fails.  In that case,
    * log the error to the console.
    *
-   * @param {string} source - Djot source text
+   * @param {string} source - a Djot source text
    * @returns {Promise<object|null>} a promise of the rendering, or of null
    */
   async function build(source) {
@@ -165,7 +176,7 @@
    * the rendering is complete, including its diagrams.  If the Djot parser
    * fails, log the error to the console and leave the page unchanged.
    *
-   * @param {string} source - Djot source text
+   * @param {string} source - a Djot source text
    */
   async function rerender(source) {
     const rendering = await build(source);
@@ -174,8 +185,17 @@
     }
     await renderDiagrams(rendering.main);
     const { scrollX, scrollY } = window;
+    // Keep the table of contents open or closed, as the user left it.
+    // Otherwise, the content below it would move, and restoring the scroll
+    // position would show different text.
+    const tocWasOpen = document.querySelector("nav.toc > details")?.open;
     djotViewer.show(document, rendering);
-    fitTocToWindow();
+    const toc = document.querySelector("nav.toc > details");
+    if (toc && tocWasOpen !== undefined) {
+      toc.open = tocWasOpen;
+    } else {
+      fitTocToWindow();
+    }
     window.scrollTo(scrollX, scrollY);
   }
 
@@ -192,9 +212,17 @@
   }
 
   /**
-   * Return the current contents of the page's file, as bytes.
+   * The bytes of a version of the page's file:  for a file:// page, a string
+   * with one character (U+0000 to U+00FF) per byte, as background.js sends
+   * them; otherwise, a Uint8Array.
    *
-   * @returns {Promise<Uint8Array|null>} a promise of the file's bytes, or of
+   * @typedef {string|Uint8Array} FileBytes
+   */
+
+  /**
+   * Return the current bytes of the page's file.
+   *
+   * @returns {Promise<FileBytes|null>} a promise of the file's bytes, or of
    *     null if the server responded with an error status, such as 404 for a
    *     deleted file
    * @throws {Error} if the file cannot be read at all
@@ -202,15 +230,37 @@
   async function fetchBytes() {
     if (location.protocol === "file:") {
       // Chrome blocks a fetch from a file:// page, so background.js reads the
-      // file.  It sends the bytes as a string of characters U+0000-U+00FF.
+      // file.
       const reply = await chrome.runtime.sendMessage({ type: "read-file" });
       if (reply.error !== undefined) {
         throw new Error(reply.error);
       }
-      return Uint8Array.from(reply.bytes, (c) => c.charCodeAt(0));
+      return reply.bytes;
     }
     const response = await fetch(location.href, { cache: "no-store" });
     return response.ok ? new Uint8Array(await response.arrayBuffer()) : null;
+  }
+
+  /**
+   * Return true if the given versions of the page's file have the same bytes.
+   *
+   * @param {FileBytes} a - a version of the file
+   * @param {FileBytes} b - another version of the file, from the same page
+   * @returns {boolean} true if `a` and `b` have the same bytes
+   */
+  function sameBytes(a, b) {
+    if (typeof a === "string") {
+      return a === b;
+    }
+    if (a.length !== b.length) {
+      return false;
+    }
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -219,10 +269,13 @@
    * the initial rendering repairs it, and with each line ending converted to
    * "\n", as Chrome's plain-text page does.
    *
-   * @param {Uint8Array} bytes - a version of the page's file
+   * @param {FileBytes} fileBytes - a version of the page's file
    * @returns {string} the file's text
    */
-  function decode(bytes) {
+  function decode(fileBytes) {
+    const bytes = typeof fileBytes === "string"
+      ? Uint8Array.from(fileBytes, (c) => c.charCodeAt(0))
+      : fileBytes;
     let decoder;
     try {
       decoder = new TextDecoder(document.characterSet);
@@ -245,6 +298,10 @@
   async function watchForChanges(source) {
     let shown = source;
     let fetched = false;
+    // The bytes that the last check read, or null before the first check.
+    // Decoding and comparing text costs more than comparing bytes, so a check
+    // decodes the file only if its bytes changed.
+    let previous = null;
     for (;;) {
       await new Promise((resolve) => setTimeout(resolve, RELOAD_INTERVAL_MS));
       if (document.visibilityState !== "visible") {
@@ -261,8 +318,12 @@
         continue;
       }
       fetched = true;
-      const current = bytes === null ? null : decode(bytes);
-      if (current !== null && current !== shown) {
+      if (bytes === null || (previous !== null && sameBytes(bytes, previous))) {
+        continue;
+      }
+      previous = bytes;
+      const current = decode(bytes);
+      if (current !== shown) {
         // If the parser fails, the page keeps its previous rendering.  Do not
         // try that text again until the file changes again.
         shown = current;
@@ -273,8 +334,10 @@
 
   async function main() {
     // An HTML page, such as a GitHub "blob" page, can also have a URL that
-    // ends in ".djot".  Leave it alone.
-    if (document.contentType !== "text/plain" && document.contentType !== "text/x-djot") {
+    // ends in ".djot".  Leave it alone.  Chrome shows other text types, such
+    // as text/plain or text/x-djot, as plain text.
+    const type = document.contentType;
+    if (!type.startsWith("text/") || type === "text/html") {
       return;
     }
     // Chrome shows a plain-text file as the contents of a <pre>.

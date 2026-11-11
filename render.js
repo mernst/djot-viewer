@@ -42,7 +42,7 @@ globalThis.djotViewer = (() => {
    * was decoded from are valid UTF-8, return the text decoded as UTF-8.
    * Otherwise, return the text unchanged.
    *
-   * @param {string} text - text that was decoded from bytes
+   * @param {string} text - a string that was decoded from bytes
    * @param {string} characterSet - the encoding that the text was decoded
    *     with, as `document.characterSet` reports it, such as "windows-1252"
    *     or "UTF-8"

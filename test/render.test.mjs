@@ -33,7 +33,8 @@ function load(path) {
  * plain-text file, with the manifest's scripts (other than content.js)
  * loaded.
  *
- * @param {string} text - the contents of the page's <pre>
+ * @param {string} text - a string, which becomes the contents of the page's
+ *     <pre>
  * @returns {Window} the window
  */
 function plainTextWindow(text) {
@@ -57,7 +58,7 @@ const djotViewer = plainTextWindow("").djotViewer;
  * That is what Chrome shows for a UTF-8 file whose encoding it guesses
  * wrongly.
  *
- * @param {string} text - text
+ * @param {string} text - a string
  * @returns {string} the misdecoded text
  */
 function misdecode(text) {

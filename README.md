@@ -7,7 +7,7 @@ as text, such as files on `raw.githubusercontent.com`.
 
 Features:
 
-- A collabsible table of contents, as a sidebar or box above the document,
+- A collapsible table of contents, as a sidebar or box above the document,
   depending on the browser window width.
 - Math, written in Djot as `` $`x^2` `` (inline) or `` $$`x^2` `` (display),
   rendered as MathML by [Temml](https://temml.org/).
