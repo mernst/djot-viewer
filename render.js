@@ -32,7 +32,7 @@ globalThis.djotViewer = (() => {
     + encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
         + "<style>@media (prefers-color-scheme: dark) { text { fill: #fff; } }</style>"
-        + '<text x="16" y="22" font-family="Arial,Helvetica,sans-serif" font-size="21"'
+        + '<text x="16" y="23" font-family="Arial,Helvetica,sans-serif" font-size="28"'
         + ' font-weight="bold" text-anchor="middle" fill="#000">dj</text></svg>',
     );
 
