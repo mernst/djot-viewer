@@ -1,36 +1,61 @@
-// The Djot viewer's service worker.  It reads a local file again for
-// content.js, which checks whether the file has changed.  content.js cannot
-// read it itself:  Chrome blocks a fetch from a file:// page, even one made
-// by an extension's content script, but it allows a fetch from the
-// extension's service worker if "Allow access to file URLs" is on.
+// The Djot viewer's service worker.  It rereads a local file for content.js,
+// which checks whether the file has changed.  content.js cannot read it
+// itself:  Chrome blocks a fetch from a file:// page, even one made by an
+// extension's content script.
+//
+// The service worker does not read the file either; an offscreen document
+// (offscreen.html) does.  Even when "Allow access to file URLs" is on, a
+// fetch of a file:// URL from the service worker sometimes fails, most often
+// after Chrome stops the idle service worker (as when the Djot page's tab is
+// hidden for about 30 seconds) and starts it again.  A fetch from an
+// offscreen document does not fail that way.
 
 "use strict";
 
+/** The URL of the offscreen document, relative to the extension's root. */
+const OFFSCREEN_URL = "offscreen.html";
+
 /**
- * Return the given bytes as a string with one character per byte, U+0000 to
- * U+00FF.  Extension messages are JSON, which cannot hold bytes directly.
+ * A promise that the offscreen document will exist, while this service
+ * worker is creating it; otherwise null.  It keeps two concurrent requests
+ * from both creating the document, which Chrome forbids.
  *
- * @param {ArrayBuffer} buffer - a sequence of bytes, such as the contents of
- *     a file
- * @returns {string} the bytes as characters
+ * @type {Promise<void>|null}
  */
-function byteString(buffer) {
-  const bytes = new Uint8Array(buffer);
-  // String.fromCharCode takes the bytes as arguments, so pass them in chunks
-  // that stay under the engine's limit on the number of arguments.
-  const chunk = 0x8000;
-  let result = "";
-  for (let i = 0; i < bytes.length; i += chunk) {
-    result += String.fromCharCode(...bytes.subarray(i, i + chunk));
+let creatingOffscreen = null;
+
+/**
+ * Create the offscreen document, unless it exists already.
+ *
+ * @returns {Promise<void>} a promise that the offscreen document exists
+ */
+async function ensureOffscreenDocument() {
+  if (creatingOffscreen === null) {
+    if (await chrome.offscreen.hasDocument()) {
+      return;
+    }
+    // Another request might have started creating the document while this
+    // one awaited hasDocument.
+    creatingOffscreen ??= chrome.offscreen
+      .createDocument({
+        url: OFFSCREEN_URL,
+        // No reason names reading a file.  BLOBS is the closest:  the
+        // document reads the file's bytes.
+        reasons: ["BLOBS"],
+        justification: "Reread a local Djot file to check whether it changed.",
+      })
+      .finally(() => {
+        creatingOffscreen = null;
+      });
   }
-  return result;
+  await creatingOffscreen;
 }
 
 // Reply to a request from content.js with the current bytes of the file that
-// the requesting page shows.  The reply is {bytes}, as from byteString, on
-// success, or {error} with a message.  The file to read is the requesting
-// page's own URL, never one in the message, so that a page cannot use this
-// to read other files.
+// the requesting page shows.  The reply is {bytes} on success, where bytes is
+// a string with one character (U+0000 to U+00FF) per byte, or {error} with a
+// message.  The file to read is the requesting page's own URL, never one in
+// the message, so that a page cannot use this to read other files.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== "read-file") {
     return false;
@@ -40,10 +65,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ error: `not a file:// page: ${url}` });
     return false;
   }
-  fetch(url, { cache: "no-store" })
-    .then((response) => response.arrayBuffer())
+  ensureOffscreenDocument()
+    .then(() => chrome.runtime.sendMessage({ type: "offscreen-read-file", url }))
     .then(
-      (buffer) => sendResponse({ bytes: byteString(buffer) }),
+      (reply) => sendResponse(reply ?? { error: "no reply from the offscreen document" }),
       (error) => sendResponse({ error: String(error) }),
     );
   // The response is sent asynchronously.

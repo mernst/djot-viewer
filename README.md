@@ -116,6 +116,10 @@ libraries.
 - `background.js` is the extension's service worker.  It rereads a local
   file for `content.js`, which checks whether the file has changed; Chrome
   does not let a content script read a `file://` URL.
+- `offscreen.html` and `offscreen.js` make up an invisible extension page
+  that does the reading for `background.js`.  A service worker's read of a
+  `file://` URL sometimes fails, especially after Chrome stops the idle
+  service worker and starts it again.
 - `content.css` styles a rendered page.
 - `vendor/` holds the libraries that the scripts use, except
   `vendor/update.sh`, which downloads them (see
