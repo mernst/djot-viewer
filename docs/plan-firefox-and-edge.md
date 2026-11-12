@@ -202,8 +202,12 @@ choose `manifest.json`) or by running `npx web-ext run`.
   picks the content type from the file name, and for an extension that it
   does not know, such as `.djot`, it might offer to download the file
   instead of showing it.  If so, the extension can do nothing about it, and
-  `README.md` must tell Firefox users how to map `.djot` to `text/plain`
-  (on Linux, for example, in `~/.mime.types`).
+  `README.md` must tell Firefox users how to map to `text/plain` every file
+  name extension that the extension handles:  `.djot`, `.dj`, `.DJOT`, and
+  `.DJ` (on Linux, for example, in `~/.mime.types`).  Check whether the
+  mapping ignores case; if it does not, the instructions must list the
+  uppercase extensions too.  Test with `test/uppercase.DJOT` and
+  `test/uppercase.DJ` as well as with a `.djot` and a `.dj` file.
 - **Content scripts run on `file://` pages.**  Chrome requires the user to
   turn on "Allow access to file URLs".  Check what Firefox requires.
 - **Host permissions are granted.**  In Firefox, a Manifest V3 extension's
@@ -227,13 +231,15 @@ choose `manifest.json`) or by running `npx web-ext run`.
   rather than log a failure and retry forever.  Test for the capability, not
   the browser, and do not match the text of an error message:  Firefox
   gives the same `NetworkError` for a blocked fetch and for a missing file,
-  and the text can change between versions.  Instead, right after the first
-  rendering, reread the page's file once.  At that moment the file is known
-  to exist, because the browser just loaded the page from it, so a failure
-  means that the browser does not allow the reread, and `content.js` should
-  not watch the page.  If the probe succeeds, watch the page as now, and a
-  later failure (such as when an editor replaces the file) is transient and
-  is retried as now.
+  and the text can change between versions.  Instead, change
+  `watchForChanges` so that, for a `file://` page, a failed reread before
+  any reread has succeeded (while `previous` is `null`) stops watching:
+  the browser just loaded the page from the file, so the failure means
+  that the browser does not allow the reread.  The first check of the
+  existing loop serves as the probe, so no separate reread is needed, and
+  Chrome and Edge read the file no more often than now.  After a reread has
+  succeeded, a failure (such as when an editor replaces the file) is
+  transient and is retried as now.
 - **Loading libraries.**  `content.js` loads Temml, highlight.js, and
   Mermaid with `import(chrome.runtime.getURL(path))`.  Firefox supports that
   in content scripts, but its extension URLs contain a random UUID that
@@ -341,10 +347,21 @@ API key.
    - Wherever the text describes all three browsers, say "the browser"
      rather than "Chrome".  Examples are the first sentence ("This Chrome
      extension ..."), "Viewing files from a local web server" ("Chrome
-     downloads the file ..."), "Known limitations", and the description of
-     `content.js` in "Development" (which calls it "the Chrome-specific
-     part").  Where Firefox behaves differently, as for local files, say
-     so.
+     downloads the file ..."), "Known limitations", and, in "Development",
+     the descriptions of `manifest.json` ("tells Chrome which pages ...")
+     and of `content.js` ("the Chrome-specific part").  Where Firefox
+     behaves differently, as for local files, say so.
+   - In "Updating", which tells the user to click the reload button in
+     `chrome://extensions` or to quit Chrome, add the steps for Firefox
+     (`about:debugging`, where a temporary add-on also disappears when
+     Firefox quits) and for Edge (`edge://extensions`).
+   - In the section about the "all websites" warning, which quotes Chrome's install warning
+     and describes Chrome's "Site access" control, describe Firefox's
+     install prompt and its "Permissions" tab, and Edge's wording of the
+     warning.
+   - In "Development", say that `background.js` runs as a service worker in
+     Chrome and Edge and as an event page in Firefox, not only that it is
+     "the extension's service worker".
    - In "Installation", give a link to each store's page, and add
      instructions for loading the extension unpacked in Firefox and Edge.
    - In "Known limitations", describe any feature that Firefox lacks, such
