@@ -13,6 +13,13 @@
   const RELOAD_INTERVAL_MS = 1000;
 
   /**
+   * The longest time between checks of the file, in milliseconds.  After each
+   * consecutive check that cannot read the file, the time until the next
+   * check doubles, up to this limit.
+   */
+  const MAX_RELOAD_INTERVAL_MS = 30000;
+
+  /**
    * Return the ES module at the given path, which is relative to the
    * extension's root directory, such as "vendor/temml/temml.mjs".  The file
    * must be listed in the manifest's `web_accessible_resources`.
@@ -46,11 +53,24 @@
   /** The state of the dark color scheme, which the user can change. */
   const darkScheme = matchMedia("(prefers-color-scheme: dark)");
 
-  /** The Djot source text that the page shows, once it has been rendered. */
-  let shownSource = "";
+  /** A promise that resolves when the last queued task is done. */
+  let queue = Promise.resolve();
 
-  /** A promise that resolves when the last requested re-rendering is done. */
-  let rerendering = Promise.resolve();
+  /**
+   * Run the given task after every task that was queued before it, so that
+   * two tasks that change the page never overlap.  If the task fails, log
+   * the error to the console.
+   *
+   * @param {function(): Promise<void>} task - a task that changes the page
+   * @returns {Promise<void>} a promise that resolves when the task is done,
+   *     whether or not it failed
+   */
+  function enqueue(task) {
+    queue = queue
+      .then(task)
+      .catch((error) => console.error("djot-viewer: updating the page failed:", error));
+    return queue;
+  }
 
   /**
    * Open the table of contents in a wide window, where it is a sidebar, and
@@ -73,12 +93,22 @@
   let mermaidPromise = null;
 
   /**
-   * Return the Mermaid module, initialized for the current color scheme.
-   * Load it the first time, and again after a failure to load it.
+   * Return the Mermaid theme for the current color scheme.
    *
+   * @returns {string} "dark" or "default"
+   */
+  function mermaidTheme() {
+    return darkScheme.matches ? "dark" : "default";
+  }
+
+  /**
+   * Return the Mermaid module, initialized with the given theme.  Load it the
+   * first time, and again after a failure to load it.
+   *
+   * @param {string} theme - a Mermaid theme, such as "dark"
    * @returns {Promise<object>} a promise of the Mermaid module
    */
-  async function loadMermaid() {
+  async function loadMermaid(theme) {
     mermaidPromise ??= load("vendor/mermaid/mermaid.esm.min.mjs");
     let mermaid;
     try {
@@ -94,9 +124,36 @@
       startOnLoad: false,
       // "strict" encodes HTML in labels and disables click handlers.
       securityLevel: "strict",
-      theme: darkScheme.matches ? "dark" : "default",
+      theme,
     });
     return mermaid;
+  }
+
+  /**
+   * Return a new div.diagram element that shows the diagram that the given
+   * Mermaid source text describes.  The element records `source` and `theme`
+   * in its `data-source` and `data-theme` attributes, so that
+   * `redrawDiagrams` can draw it again.
+   *
+   * @param {object} mermaid - the Mermaid module, as `loadMermaid` returns it
+   * @param {string} theme - the theme that `mermaid` is initialized with
+   * @param {string} source - a Mermaid source text
+   * @returns {Promise<Element>} a promise of the element
+   * @throws {Error} if Mermaid cannot render `source`
+   */
+  async function drawDiagram(mermaid, theme, source) {
+    // `parse` reports a syntax error without leaving an error diagram in the
+    // document, as `render` can.
+    await mermaid.parse(source);
+    // Each id is new, because Mermaid removes any element that already has
+    // the id, such as a diagram that the page still shows.
+    const { svg } = await mermaid.render(`djot-viewer-diagram-${++diagramCount}`, source);
+    const diagram = document.createElement("div");
+    diagram.className = "diagram";
+    diagram.dataset.source = source;
+    diagram.dataset.theme = theme;
+    diagram.innerHTML = svg;
+    return diagram;
   }
 
   /**
@@ -112,32 +169,53 @@
     if (blocks.length === 0) {
       return;
     }
+    const theme = mermaidTheme();
     let mermaid;
     try {
-      mermaid = await loadMermaid();
+      mermaid = await loadMermaid(theme);
     } catch (error) {
       console.error("djot-viewer: loading Mermaid failed:", error);
       return;
     }
     for (const code of blocks) {
       const pre = code.parentElement;
-      const source = code.textContent;
       try {
-        // `parse` reports a syntax error without leaving an error diagram in
-        // the document, as `render` can.
-        await mermaid.parse(source);
-        // Each id is new, because Mermaid removes any element that already
-        // has the id, such as a diagram that the page still shows.
-        const { svg } = await mermaid.render(`djot-viewer-diagram-${++diagramCount}`, source);
-        const diagram = document.createElement("div");
-        diagram.className = "diagram";
-        diagram.innerHTML = svg;
-        pre.replaceWith(diagram);
+        pre.replaceWith(await drawDiagram(mermaid, theme, code.textContent));
       } catch (error) {
         const message = document.createElement("p");
         message.className = "diagram-error";
         message.textContent = `Diagram error: ${error?.message ?? error}`;
         pre.after(message);
+      }
+    }
+  }
+
+  /**
+   * Draw again, in place, each diagram in the page whose theme differs from
+   * the current color scheme's.  The rest of the page follows the color
+   * scheme through CSS, but a diagram keeps the theme that it was drawn
+   * with.  If a diagram cannot be drawn again, keep it and log the error to
+   * the console.
+   */
+  async function redrawDiagrams() {
+    const theme = mermaidTheme();
+    const stale = [...document.querySelectorAll("main.djot div.diagram")]
+      .filter((diagram) => diagram.dataset.theme !== theme);
+    if (stale.length === 0) {
+      return;
+    }
+    let mermaid;
+    try {
+      mermaid = await loadMermaid(theme);
+    } catch (error) {
+      console.error("djot-viewer: loading Mermaid failed:", error);
+      return;
+    }
+    for (const diagram of stale) {
+      try {
+        diagram.replaceWith(await drawDiagram(mermaid, theme, diagram.dataset.source));
+      } catch (error) {
+        console.error("djot-viewer: drawing a diagram again failed:", error);
       }
     }
   }
@@ -206,23 +284,6 @@
       fitTocToWindow();
     }
     window.scrollTo(scrollX, scrollY);
-  }
-
-  /**
-   * Render the page again from the given Djot source text, as `rerender`
-   * does, after any re-rendering that is in progress, so that two
-   * re-renderings never overlap.
-   *
-   * @param {string} source - a Djot source text
-   * @returns {Promise<void>} a promise that resolves when the page shows the
-   *     rendering of `source`
-   */
-  function queueRerender(source) {
-    shownSource = source;
-    rerendering = rerendering
-      .then(() => rerender(source))
-      .catch((error) => console.error("djot-viewer: rendering again failed:", error));
-    return rerendering;
   }
 
   /**
@@ -317,17 +378,23 @@
    * Check the page's file for changes every RELOAD_INTERVAL_MS while the tab
    * is visible, and render the page again when the file changes.  If a check
    * cannot read the file, as when a local server restarts or an editor
-   * replaces the file, try again at the next check; log only the first
-   * failure to the console.  Stop when the extension is reloaded or removed.
+   * replaces the file, try again later, waiting twice as long after each
+   * consecutive failure, up to MAX_RELOAD_INTERVAL_MS.  Log the first failure
+   * of each run of failures to the console.  Stop when the extension is
+   * reloaded or removed.
+   *
+   * @param {string} source - a Djot source text, which the page shows now
    */
-  async function watchForChanges() {
-    let reported = false;
+  async function watchForChanges(source) {
+    // The text that the page shows, or that the parser failed on.
+    let shown = source;
+    let interval = RELOAD_INTERVAL_MS;
     // The bytes that the last check read, or null before the first check.
     // Decoding and comparing text costs more than comparing bytes, so a check
     // decodes the file only if its bytes changed.
     let previous = null;
     for (;;) {
-      await new Promise((resolve) => setTimeout(resolve, RELOAD_INTERVAL_MS));
+      await new Promise((resolve) => setTimeout(resolve, interval));
       if (!chrome.runtime?.id) {
         // The extension was reloaded or removed, so this script can no longer
         // reach background.js or load libraries.  The page keeps its
@@ -341,21 +408,23 @@
       try {
         bytes = await fetchBytes();
       } catch (error) {
-        if (!reported) {
+        if (interval === RELOAD_INTERVAL_MS) {
           console.error("djot-viewer: cannot check the file for changes; will keep trying:", error);
-          reported = true;
         }
+        interval = Math.min(2 * interval, MAX_RELOAD_INTERVAL_MS);
         continue;
       }
+      interval = RELOAD_INTERVAL_MS;
       if (bytes === null || (previous !== null && sameBytes(bytes, previous))) {
         continue;
       }
       previous = bytes;
       const current = decode(bytes);
-      if (current !== shownSource) {
+      if (current !== shown) {
         // If the parser fails, the page keeps its previous rendering.  Do not
         // try that text again until the file changes again.
-        await queueRerender(current);
+        shown = current;
+        await enqueue(() => rerender(current));
       }
     }
   }
@@ -383,20 +452,15 @@
     // load.  As each diagram appears, Chrome's scroll anchoring keeps the
     // visible text in place.
     djotViewer.show(document, rendering);
-    shownSource = source;
     fitTocToWindow();
     scrollToFragment();
     wideWindow.addEventListener("change", fitTocToWindow);
-    darkScheme.addEventListener("change", () => {
-      // The rest of the page follows the color scheme through CSS, but a
-      // diagram keeps the Mermaid theme that it was drawn with.
-      if (document.querySelector("main.djot div.diagram")) {
-        queueRerender(shownSource);
-      }
-    });
-    await renderDiagrams(rendering.main);
+    // A change of color scheme while diagrams are being drawn is handled
+    // after they are drawn, because tasks in the queue never overlap.
+    darkScheme.addEventListener("change", () => enqueue(redrawDiagrams));
+    enqueue(() => renderDiagrams(rendering.main));
     if (isLocal()) {
-      await watchForChanges();
+      await watchForChanges(source);
     }
   }
 
