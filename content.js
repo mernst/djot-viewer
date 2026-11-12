@@ -43,6 +43,15 @@
   /** The state of WIDE_WINDOW, which changes as the window is resized. */
   const wideWindow = matchMedia(WIDE_WINDOW);
 
+  /** The state of the dark color scheme, which the user can change. */
+  const darkScheme = matchMedia("(prefers-color-scheme: dark)");
+
+  /** The Djot source text that the page shows, once it has been rendered. */
+  let shownSource = "";
+
+  /** A promise that resolves when the last requested re-rendering is done. */
+  let rerendering = Promise.resolve();
+
   /**
    * Open the table of contents in a wide window, where it is a sidebar, and
    * close it in a narrow one, where it is a box above the document.
@@ -79,13 +88,13 @@
       mermaidPromise = null;
       throw error;
     }
-    // Initialize on every call, so that diagrams follow a change of color
-    // scheme, as the rest of the page does.
+    // Initialize on every call, so that diagrams drawn after a change of
+    // color scheme use the new scheme's theme.
     mermaid.initialize({
       startOnLoad: false,
       // "strict" encodes HTML in labels and disables click handlers.
       securityLevel: "strict",
-      theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default",
+      theme: darkScheme.matches ? "dark" : "default",
     });
     return mermaid;
   }
@@ -200,6 +209,23 @@
   }
 
   /**
+   * Render the page again from the given Djot source text, as `rerender`
+   * does, after any re-rendering that is in progress, so that two
+   * re-renderings never overlap.
+   *
+   * @param {string} source - a Djot source text
+   * @returns {Promise<void>} a promise that resolves when the page shows the
+   *     rendering of `source`
+   */
+  function queueRerender(source) {
+    shownSource = source;
+    rerendering = rerendering
+      .then(() => rerender(source))
+      .catch((error) => console.error("djot-viewer: rendering again failed:", error));
+    return rerendering;
+  }
+
+  /**
    * Return true if the page's file is local or on this computer, so that
    * checking it for changes every second costs little.
    *
@@ -289,21 +315,25 @@
 
   /**
    * Check the page's file for changes every RELOAD_INTERVAL_MS while the tab
-   * is visible, and render the page again when the file changes.  If the
-   * first check cannot read the file, log the error to the console and stop
-   * checking.  Later failures, as when a local server restarts, are ignored.
-   *
-   * @param {string} source - a Djot source text, which the page shows now
+   * is visible, and render the page again when the file changes.  If a check
+   * cannot read the file, as when a local server restarts or an editor
+   * replaces the file, try again at the next check; log only the first
+   * failure to the console.  Stop when the extension is reloaded or removed.
    */
-  async function watchForChanges(source) {
-    let shown = source;
-    let fetched = false;
+  async function watchForChanges() {
+    let reported = false;
     // The bytes that the last check read, or null before the first check.
     // Decoding and comparing text costs more than comparing bytes, so a check
     // decodes the file only if its bytes changed.
     let previous = null;
     for (;;) {
       await new Promise((resolve) => setTimeout(resolve, RELOAD_INTERVAL_MS));
+      if (!chrome.runtime?.id) {
+        // The extension was reloaded or removed, so this script can no longer
+        // reach background.js or load libraries.  The page keeps its
+        // rendering until the user reloads the tab.
+        return;
+      }
       if (document.visibilityState !== "visible") {
         continue;
       }
@@ -311,23 +341,21 @@
       try {
         bytes = await fetchBytes();
       } catch (error) {
-        if (!fetched) {
-          console.error("djot-viewer: automatic reloading is unavailable:", error);
-          return;
+        if (!reported) {
+          console.error("djot-viewer: cannot check the file for changes; will keep trying:", error);
+          reported = true;
         }
         continue;
       }
-      fetched = true;
       if (bytes === null || (previous !== null && sameBytes(bytes, previous))) {
         continue;
       }
       previous = bytes;
       const current = decode(bytes);
-      if (current !== shown) {
+      if (current !== shownSource) {
         // If the parser fails, the page keeps its previous rendering.  Do not
         // try that text again until the file changes again.
-        shown = current;
-        await rerender(current);
+        await queueRerender(current);
       }
     }
   }
@@ -355,12 +383,20 @@
     // load.  As each diagram appears, Chrome's scroll anchoring keeps the
     // visible text in place.
     djotViewer.show(document, rendering);
+    shownSource = source;
     fitTocToWindow();
     scrollToFragment();
     wideWindow.addEventListener("change", fitTocToWindow);
+    darkScheme.addEventListener("change", () => {
+      // The rest of the page follows the color scheme through CSS, but a
+      // diagram keeps the Mermaid theme that it was drawn with.
+      if (document.querySelector("main.djot div.diagram")) {
+        queueRerender(shownSource);
+      }
+    });
     await renderDiagrams(rendering.main);
     if (isLocal()) {
-      await watchForChanges(source);
+      await watchForChanges();
     }
   }
 

@@ -145,7 +145,11 @@ html.djot-viewer a[role="doc-noteref"] {
 
 /* Math */
 
-html.djot-viewer math {
+/* vendor/temml/temml.css sets font-family: Temml for primes and script
+   letters, but the extension does not include Temml's font (see
+   vendor/update.sh).  So this selector is more specific than temml.css's. */
+html.djot-viewer math,
+html.djot-viewer math :is(.mathscr, mo.tml-prime) {
   font-family: "STIX Two Math", "Latin Modern Math", "Cambria Math", math;
 }
 
