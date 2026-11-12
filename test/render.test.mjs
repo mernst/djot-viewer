@@ -125,6 +125,15 @@ describe("render", () => {
     assert.equal(rendering.nodes[1], rendering.main);
   });
 
+  test("showing a new rendering keeps exactly one icon", async () => {
+    const window = plainTextWindow("");
+    const { document, djotViewer: viewer } = window;
+    await viewer.render(document, "# One\n", { fileName: "f.djot", load });
+    viewer.show(document, await viewer.build(document, "# Two\n", { fileName: "f.djot", load }));
+    assert.equal(document.title, "Two");
+    assert.equal(document.head.querySelectorAll('link[rel="icon"]').length, 1);
+  });
+
   test("leaves the page unchanged if the parser fails", async () => {
     const window = plainTextWindow("text");
     const before = window.document.documentElement.outerHTML;

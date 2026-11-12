@@ -24,10 +24,14 @@ globalThis.djotViewer = (() => {
   /** The minimum number of headings of levels 1-3 for a table of contents. */
   const TOC_MIN_HEADINGS = 3;
 
-  /** The URL of the page's icon:  the letters "dj" on a blue square. */
+  /**
+   * The URL of the page's icon:  the letters "dj" on a square whose blue is
+   * the link color (`--djot-link` in content.css) of the color scheme.
+   */
   const FAVICON = "data:image/svg+xml,"
     + encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+        + "<style>@media (prefers-color-scheme: dark) { rect { fill: #4493f8; } }</style>"
         + '<rect width="32" height="32" rx="6" fill="#0969da"/>'
         + '<text x="16" y="22" font-family="Arial,Helvetica,sans-serif" font-size="21"'
         + ' font-weight="bold" text-anchor="middle" fill="#fff">dj</text></svg>',
@@ -133,7 +137,7 @@ globalThis.djotViewer = (() => {
 
   /**
    * Replace the body of the given document by the given rendering, and set
-   * the document's title and icon.
+   * the document's title.
    *
    * @param {Document} document - a document, such as Chrome's page for a
    *     plain-text file
@@ -143,19 +147,28 @@ globalThis.djotViewer = (() => {
   function show(document, rendering) {
     document.documentElement.classList.add("djot-viewer");
     document.title = rendering.title;
-    if (!document.querySelector('link[rel="icon"]')) {
-      const icon = document.createElement("link");
-      icon.rel = "icon";
-      icon.href = FAVICON;
-      document.head.append(icon);
-    }
     document.body.replaceChildren(...rendering.nodes);
   }
 
   /**
+   * Add the viewer's icon (FAVICON) to the head of the given document, as a
+   * `<link rel="icon">` element.  Each call adds another such element.
+   *
+   * @param {Document} document - a document, such as Chrome's page for a
+   *     plain-text file
+   */
+  function addIcon(document) {
+    const icon = document.createElement("link");
+    icon.rel = "icon";
+    icon.href = FAVICON;
+    document.head.append(icon);
+  }
+
+  /**
    * Replace the body of the given document by the rendering of the given Djot
-   * source text, and set the document's title.  This is `build` followed by
-   * `show`.  If the Djot parser fails, throw before changing the document.
+   * source text, and set the document's title and icon.  This is `build`
+   * followed by `show` and `addIcon`.  If the Djot parser fails, throw before
+   * changing the document.
    *
    * @param {Document} document - a document, such as Chrome's page for a
    *     plain-text file
@@ -165,6 +178,7 @@ globalThis.djotViewer = (() => {
    */
   async function render(document, source, options) {
     show(document, await build(document, source, options));
+    addIcon(document);
   }
 
   /**
@@ -381,5 +395,5 @@ globalThis.djotViewer = (() => {
     return item;
   }
 
-  return { repairEncoding, build, show, render };
+  return { repairEncoding, build, show, addIcon, render };
 })();

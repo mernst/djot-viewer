@@ -452,6 +452,7 @@
     // load.  As each diagram appears, Chrome's scroll anchoring keeps the
     // visible text in place.
     djotViewer.show(document, rendering);
+    djotViewer.addIcon(document);
     fitTocToWindow();
     scrollToFragment();
     wideWindow.addEventListener("change", fitTocToWindow);
