@@ -15,9 +15,9 @@ to it as "the Chrome document".
 
 Edge is built on Chromium, so the Chrome package works in Edge unchanged,
 and publishing for Edge is mostly paperwork.  Firefox needs changes to the
-manifest and probably to the reloading of local files, and it needs testing
-of every feature, because Firefox's extension platform differs from
-Chrome's in ways that matter to this extension.
+manifest and to Temml's stylesheet, and probably to the reloading of local
+files, and it needs testing of every feature, because Firefox's extension
+platform differs from Chrome's in ways that matter to this extension.
 
 Recommended order:
 
@@ -62,8 +62,10 @@ These choices affect the work below.  Each has a recommendation.
 These are needed by every store, and the Chrome document describes each of
 them.  Do them once.
 
-- Add icons (16, 32, 48, and 128 pixels square) to the extension and to
-  `manifest.json`.  Edge's listing also wants a logo of at least 128x128
+- Add icons (16, 32, 48, 96, and 128 pixels square) to the extension and to
+  `manifest.json`.  Firefox's add-ons manager uses the 96-pixel icon on
+  high-DPI displays; without it, Firefox scales up the 48-pixel icon, which
+  looks blurry.  Edge's listing also wants a logo of at least 128x128
   pixels; 300x300 is recommended, so draw the artwork at a size that scales
   to 300x300.
 - Commit a privacy policy, such as `PRIVACY.md`, that says the extension
@@ -100,20 +102,26 @@ Microsoft's guide is
    Registration has no fee.
 2. Click "Create new extension" and upload the ZIP file.
 3. **Availability:**  visibility "Public"; all markets.
-4. **Properties:**  category (such as "Developer tools"), website
-   (`https://github.com/mernst/djot-viewer`), and support contact (the
-   repository's issues page).
-5. **Privacy:**  the same answers as for the Chrome Web Store's "Privacy"
-   tab, which the Chrome document gives:  the single purpose, the
-   justification of the content script's match patterns, no remote code, no
-   data collected, and the privacy policy URL.
-6. **Store listings:**  a description of at least 250 characters (Edge's
+4. **Properties:**  category (such as "Developer tools"); the privacy
+   questions, which are part of this page:  answer that the extension does
+   not access, collect, or transmit personal information, and give the
+   privacy policy URL anyway; website
+   (`https://github.com/mernst/djot-viewer`); and support contact (the
+   repository's issues page).  Partner Center has no separate "Privacy" page
+   and none of the Chrome Web Store's fields for the single purpose, the
+   justification of permissions, or remote code.
+5. **Store listings:**  a description of at least 250 characters (Edge's
    minimum, which a short description would not meet; reuse the Chrome
    listing's long description), the logo, and the screenshots.  The name and
    short description come from `manifest.json` and cannot be edited in
    Partner Center.
-7. **Notes for certification:**  the same test instructions as for Chrome.
-8. Click "Publish".  Certification can take up to seven business days.
+6. **Notes for certification:**  the same test instructions as for Chrome,
+   plus the Chrome document's justification of the content script's match
+   patterns, because Partner Center has no other place for it.
+7. Click "Publish".  Certification can take up to seven business days.
+
+Partner Center changes its form from time to time, so check these steps
+against the form when submitting.
 
 An update is a new ZIP file with a larger `version`, uploaded on the
 extension's "Packages" page, followed by "Publish".
@@ -163,6 +171,26 @@ discoverability and avoids that extra step.
    140 (an Extended Support Release), which is the reason for
    `strict_min_version`.
 
+### Stylesheet changes
+
+Temml's stylesheet `dist/Temml-Local.css` ends with an
+`@-moz-document url-prefix() { ... }` block, which only Firefox applies.  It
+holds Temml's fixes for Firefox's layout of MathML:  it keeps `math` from
+wrapping (`math { display: inline; }` and `math > mrow { padding: 0 }`), and
+it corrects the spacing between the rows of an array (padding of `mtd` in
+`mtable`).  `scope_css` in `vendor/update.sh` drops every `@-moz-document`
+rule, because it cannot nest such a rule inside the selector
+`html.djot-viewer`.  So `vendor/temml/temml.css` lacks these fixes, and in
+Firefox, math can wrap, have extra padding, or space the rows of an array
+wrongly.
+
+Change `scope_css` to keep the block, by replacing
+`@-moz-document url-prefix()` with `@supports (-moz-appearance: none)`.
+Only Firefox supports `-moz-appearance`, so the replacement applies the
+rules in the same browsers, and unlike `@-moz-document`, `@supports` can be
+nested inside a selector.  Then run `vendor/update.sh` again, and check that
+`test/math.djot` renders correctly in both Firefox and Chrome.
+
 ### Behavior to test
 
 Each of these is a known difference between Firefox and Chrome that might
@@ -197,8 +225,15 @@ choose `manifest.json`) or by running `npx web-ext run`.
   [Decisions for the maintainer](#decisions-for-the-maintainer)).  In that
   case, `content.js` should not start watching a `file://` page in Firefox,
   rather than log a failure and retry forever.  Test for the capability, not
-  the browser:  stop watching if the first reread fails with the error that
-  Firefox gives.
+  the browser, and do not match the text of an error message:  Firefox
+  gives the same `NetworkError` for a blocked fetch and for a missing file,
+  and the text can change between versions.  Instead, right after the first
+  rendering, reread the page's file once.  At that moment the file is known
+  to exist, because the browser just loaded the page from it, so a failure
+  means that the browser does not allow the reread, and `content.js` should
+  not watch the page.  If the probe succeeds, watch the page as now, and a
+  later failure (such as when an editor replaces the file) is transient and
+  is retried as now.
 - **Loading libraries.**  `content.js` loads Temml, highlight.js, and
   Mermaid with `import(chrome.runtime.getURL(path))`.  Firefox supports that
   in content scripts, but its extension URLs contain a random UUID that
@@ -211,8 +246,26 @@ choose `manifest.json`) or by running `npx web-ext run`.
 - **Messages.**  Firefox passes messages by structured clone, and Chrome
   passes them as JSON.  The extension's messages hold only strings, so this
   is not expected to matter.
-- **Math rendering.**  Firefox has long supported MathML, so math should
-  render at least as well as in Chrome.
+- **Math rendering.**  Firefox has long supported MathML, but Temml relies
+  on Firefox-only rules to lay it out well (see
+  [Stylesheet changes](#stylesheet-changes)).  Check `test/math.djot`,
+  especially inline math in a long line and the spacing between the rows
+  of an array, both before and after the stylesheet change.
+- **Encoding of local files.**  `content.js` and `repairEncoding` in
+  `render.js` depend on `document.characterSet`, the encoding that the
+  browser guessed for a plain-text page.  Firefox guesses with a different
+  detector than Chrome's, and `repairEncoding` repairs only one wrong guess:
+  a UTF-8 file decoded as windows-1252.  Check that
+  `test/encoding-utf8.djot` and `test/encoding-latin1.djot` render as the
+  goal files `test/encoding-utf8.html.goal` and
+  `test/encoding-latin1.html.goal` show, both as local files and after an
+  automatic reload on `localhost`.
+- **Remote files.**  Check the files in `test/` from
+  `raw.githubusercontent.com`, as for Edge.  That site sends a strict
+  Content Security Policy (`default-src 'none'` and `sandbox`), and Firefox
+  applies a page's CSP differently from Chrome to a content script and to
+  the scripts that it loads with `import()`.  Check that the content script
+  runs at all, and that math, highlighting, and diagrams appear.
 - **The rest of `README.md`'s features:**  the table of contents at both
   window widths, both color schemes, the tab title, and reloading of a file
   on `localhost`.
@@ -223,10 +276,15 @@ depend on the browser and need no change.
 ### Tools
 
 Mozilla's [`web-ext`](https://github.com/mozilla/web-ext) tool runs,
-checks, and signs Firefox extensions.  Run `npx web-ext lint` before each
-upload; it applies the same checks as AMO's validator.  Consider adding
-`web-ext` to `devDependencies` in `package.json`, with an `npm` script for
-`web-ext lint`.
+checks, and signs Firefox extensions.  Before each upload, unzip the ZIP
+file into an empty directory and run `npx web-ext lint --source-dir DIR` on
+that directory; it applies the same checks as AMO's validator.  Lint the
+unzipped ZIP file, not the repository:  run in the repository,
+`web-ext lint` checks files that are not in the ZIP file (`test/`,
+`package.json`, `vendor/update.sh`, and uncommitted files), and it misses a
+problem that only the ZIP file has, such as a file that `git archive` left
+out.  Consider adding `web-ext` to `devDependencies` in `package.json`, with
+an `npm` script that builds the ZIP file, unzips it, and lints it.
 
 ## Phase 4:  Firefox publishing
 
@@ -241,16 +299,23 @@ Mozilla's guide is
    the security and privacy warnings, which can cause the review to reject
    the add-on.
 4. **Source code:**  AMO asks whether the add-on contains minified code.
-   `vendor/` holds minified files (`purify.min.js`, `highlight.min.js`, and
-   Mermaid's `.mjs` files).  AMO accepts a third-party library without
-   source code if the file is identical to the library's published release.
-   `vendor/update.sh` copies each library's files unchanged from npm, so in
-   the notes for reviewers, list each library's npm package and version
-   (the table in the "Vendored libraries" section of `README.md`), and the
-   path of each file within the package.  The generated stylesheets
-   `vendor/temml/temml.css` and `vendor/highlight.js/highlight.css` are not
-   copies of released files; the notes should say that `vendor/update.sh`
-   generates them from the libraries' stylesheets.
+   `vendor/` holds minified files (`djot/djot.js`, which is a minified UMD
+   bundle despite its name, `dompurify/purify.min.js`,
+   `highlight.js/highlight.min.js`, and Mermaid's `.mjs` files).  AMO
+   accepts a third-party library without source code if the file is
+   identical to the library's published release.  `vendor/update.sh` copies
+   each library's files unchanged from npm, so in the notes for reviewers,
+   list each library's npm package and version (the table in the "Vendored
+   libraries" section of `README.md`), and the path of each file within the
+   package.  The generated stylesheets `vendor/temml/temml.css` and
+   `vendor/highlight.js/highlight.css` are not copies of released files, and
+   `vendor/update.sh`, which generates them from the libraries'
+   stylesheets, is not in the ZIP file.  So answer that the add-on contains
+   minified code, and upload a source archive of the whole repository,
+   built with `git archive --format=zip -o djot-viewer-source.zip vX.Y.Z`
+   from the release's tag.  The notes should say that `vendor/update.sh` in
+   the source archive generates the stylesheets, and that running it
+   reproduces `vendor/` (it needs `npm` and Node.js).
 5. **Listing:**  name, summary (at most 250 characters), description,
    categories, the MIT license, the homepage and support URLs, the
    privacy policy, the icon, and the screenshots.  Reuse the Chrome
@@ -271,7 +336,15 @@ API key.
    three stores, or add a sibling document for each store.  The steps that
    prepare a release (testing, increasing `version`, tagging, and building
    the ZIP file) are shared.
-2. Update `README.md`:
+2. Update `README.md`, which calls the project a Chrome extension
+   throughout:
+   - Wherever the text describes all three browsers, say "the browser"
+     rather than "Chrome".  Examples are the first sentence ("This Chrome
+     extension ..."), "Viewing files from a local web server" ("Chrome
+     downloads the file ..."), "Known limitations", and the description of
+     `content.js` in "Development" (which calls it "the Chrome-specific
+     part").  Where Firefox behaves differently, as for local files, say
+     so.
    - In "Installation", give a link to each store's page, and add
      instructions for loading the extension unpacked in Firefox and Edge.
    - In "Known limitations", describe any feature that Firefox lacks, such
@@ -279,6 +352,11 @@ API key.
    - In "Comparison with Markdown viewers", remove the bullet that says the
      extension runs only in Chrome.
    - Update the required browser versions.
+   - In "Tests", describe how to test in Firefox and Edge, not only in
+     Chrome.
+
+   Also change the `description` in `package.json`, which says "Chrome
+   extension".
 3. Optionally, automate uploads with a GitHub Actions workflow that runs on
    a version tag:  the Chrome Web Store API, `web-ext sign` for AMO, and the
    Edge Add-ons API each accept a ZIP file.  Each needs credentials stored as
