@@ -24,6 +24,15 @@ globalThis.djotViewer = (() => {
   /** The minimum number of headings of levels 1-3 for a table of contents. */
   const TOC_MIN_HEADINGS = 3;
 
+  /** The URL of the page's icon:  the letters "dj" on a blue square. */
+  const FAVICON = "data:image/svg+xml,"
+    + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+        + '<rect width="32" height="32" rx="6" fill="#0969da"/>'
+        + '<text x="16" y="22" font-family="Arial,Helvetica,sans-serif" font-size="21"'
+        + ' font-weight="bold" text-anchor="middle" fill="#fff">dj</text></svg>',
+    );
+
   // DOMPurify removes an id that is also the name of a property of `document`
   // or of a form, such as "title", because such an id on an element such as
   // <img> or <object> overrides that property ("DOM clobbering").  An id on a
@@ -124,7 +133,7 @@ globalThis.djotViewer = (() => {
 
   /**
    * Replace the body of the given document by the given rendering, and set
-   * the document's title.
+   * the document's title and icon.
    *
    * @param {Document} document - a document, such as Chrome's page for a
    *     plain-text file
@@ -134,6 +143,12 @@ globalThis.djotViewer = (() => {
   function show(document, rendering) {
     document.documentElement.classList.add("djot-viewer");
     document.title = rendering.title;
+    if (!document.querySelector('link[rel="icon"]')) {
+      const icon = document.createElement("link");
+      icon.rel = "icon";
+      icon.href = FAVICON;
+      document.head.append(icon);
+    }
     document.body.replaceChildren(...rendering.nodes);
   }
 
