@@ -22,7 +22,8 @@ Features:
   sql, swift, typescript, vbnet, wasm, xml, and yaml.
 - A light and a dark appearance, following the system's color scheme.
 - The tab title is the first level-1 heading, or the file name if there is
-  none.  The tab icon is the letters "dj" on a blue square.
+  none.  The tab icon is the letters "dj", following the system's color
+  scheme:  black for light and white for dark.
 - Automatic reloading of a local file (`file://`) or a file on `localhost`:
   about a second after the file changes, the page shows the new version, at
   the same scroll position.  The extension checks for changes only while the

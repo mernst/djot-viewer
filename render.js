@@ -25,16 +25,15 @@ globalThis.djotViewer = (() => {
   const TOC_MIN_HEADINGS = 3;
 
   /**
-   * The URL of the page's icon:  the letters "dj" on a square whose blue is
-   * the link color (`--djot-link` in content.css) of the color scheme.
+   * The URL of the page's icon:  the letters "dj" on a transparent
+   * background, black in the light color scheme and white in the dark one.
    */
   const FAVICON = "data:image/svg+xml,"
     + encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
-        + "<style>@media (prefers-color-scheme: dark) { rect { fill: #4493f8; } }</style>"
-        + '<rect width="32" height="32" rx="6" fill="#0969da"/>'
-        + '<text x="16" y="22" font-family="Arial,Helvetica,sans-serif" font-size="21"'
-        + ' font-weight="bold" text-anchor="middle" fill="#fff">dj</text></svg>',
+        + "<style>@media (prefers-color-scheme: dark) { text { fill: #fff; } }</style>"
+        + '<text x="16" y="23" font-family="Arial,Helvetica,sans-serif" font-size="28"'
+        + ' font-weight="bold" text-anchor="middle" fill="#000">dj</text></svg>',
     );
 
   // DOMPurify removes an id that is also the name of a property of `document`
