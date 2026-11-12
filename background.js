@@ -41,7 +41,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
   fetch(url, { cache: "no-store" })
-    .then((response) => response.arrayBuffer())
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`status ${response.status} reading ${url}`);
+      }
+      return response.arrayBuffer();
+    })
     .then(
       (buffer) => sendResponse({ bytes: byteString(buffer) }),
       (error) => sendResponse({ error: String(error) }),
