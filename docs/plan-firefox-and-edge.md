@@ -317,11 +317,24 @@ Mozilla's guide is
    `vendor/highlight.js/highlight.css` are not copies of released files, and
    `vendor/update.sh`, which generates them from the libraries'
    stylesheets, is not in the ZIP file.  So answer that the add-on contains
-   minified code, and upload a source archive of the whole repository,
-   built with `git archive --format=zip -o djot-viewer-source.zip vX.Y.Z`
-   from the release's tag.  The notes should say that `vendor/update.sh` in
-   the source archive generates the stylesheets, and that running it
-   reproduces `vendor/` (it needs `npm` and Node.js).
+   minified code, and upload a source archive of the whole repository at
+   the release's tag.  Do not build the source archive with `git archive`:
+   it omits every file that `.gitattributes` marks `export-ignore`,
+   including `vendor/update.sh`, `README.md`, and `test/`, so it builds the
+   same ZIP file as the extension's package.  Instead, check out the tag in
+   a temporary worktree and zip the files that git tracks there:
+
+   ```sh
+   VERSION=$(node -p 'require("./manifest.json").version')
+   dir=$(mktemp -d)/djot-viewer
+   git worktree add --detach "$dir" "v$VERSION"
+   (cd "$dir" && git ls-files -z | xargs -0 zip -q "$OLDPWD/djot-viewer-source-$VERSION.zip")
+   git worktree remove "$dir"
+   ```
+
+   The notes should say that `vendor/update.sh` in the source archive
+   generates the stylesheets, and that running it reproduces `vendor/` (it
+   needs `npm` and Node.js).
 5. **Listing:**  name, summary (at most 250 characters), description,
    categories, the MIT license, the homepage and support URLs, the
    privacy policy, the icon, and the screenshots.  Reuse the Chrome
@@ -341,7 +354,8 @@ API key.
 1. Generalize the Chrome document into a release checklist that covers all
    three stores, or add a sibling document for each store.  The steps that
    prepare a release (testing, increasing `version`, tagging, and building
-   the ZIP file) are shared.
+   the ZIP file) are shared.  Building AMO's source archive (see
+   [Phase 4](#phase-4--firefox-publishing)) belongs in the checklist too.
 2. Update `README.md`, which calls the project a Chrome extension
    throughout:
    - Wherever the text describes all three browsers, say "the browser"
