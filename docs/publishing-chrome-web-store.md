@@ -31,7 +31,8 @@ change from time to time:
 4. Optionally, on the same page, turn on email notifications for when an
    item is staged or published.
 
-A new account can have at most two published extensions at a time.
+A new publisher can have at most two published extensions, according to
+[Publish in the Chrome Web Store](https://developer.chrome.com/docs/webstore/publish).
 
 ### Add icons to the extension
 
@@ -54,9 +55,8 @@ extension currently has none.  Before the first upload:
    },
    ```
 
-3. Add `icons` to the list of files in the `git archive` command in
-   [Build the package](#build-the-package), and add a bullet for the icons to
-   the list of files in the "Development" section of `README.md`.
+3. Add a bullet for the icons to the list of files in the "Development"
+   section of `README.md`.
 
 ### Write a privacy policy
 
@@ -66,9 +66,12 @@ enough.  For example, commit a file `PRIVACY.md` that says:
 
 > Djot Viewer does not collect, store, or transmit any data.  It reads the
 > text of a page whose URL ends in `.djot`, `.dj`, `.DJOT`, or `.DJ`, and
-> renders it in the same tab.  For a local file, the extension's service
-> worker rereads the file to detect changes; the file's contents never leave
-> the browser.
+> renders it in the same tab.  For a local file, or a file on a web server on
+> the user's own computer (`localhost`, `127.0.0.1`, or `[::1]`), the
+> extension rereads the file about once a second while the tab is visible,
+> to detect changes.  It rereads a local file from disk, and it requests a
+> file on `localhost` again from the same server.  The file's contents never
+> leave the user's computer.
 
 Then use the file's GitHub URL, such as
 `https://github.com/mernst/djot-viewer/blob/main/PRIVACY.md`, as the privacy
@@ -84,43 +87,62 @@ Do these steps for the first release and for every later one.
    Chrome as described in the "Tests" section of `README.md`.  Use a Chrome
    whose version is the `minimum_chrome_version` in `manifest.json`, if you
    can, as well as the current Chrome.
-2. Increase `version` in `manifest.json`.  Every upload must have a larger
-   version than the previous one, even an upload that is rejected or never
-   published.  A version is one to four integers separated by dots, such as
-   `0.2.0`.
-3. Commit the change, and tag the commit, as in:
+2. For a release after the first one, increase `version` in
+   `manifest.json`, and commit and push the change.  Google requires "Each
+   new version must have a larger version number than the previous version"
+   ([Update your Chrome Web Store item](https://developer.chrome.com/docs/webstore/update)).
+   A version is one to four integers separated by dots, such as `0.2.0`.  For
+   the first release, keep the version that `manifest.json` already has.
 
    ```sh
    git commit -m "Version 0.2.0" manifest.json
-   git tag v0.2.0
-   git push && git push --tags
+   git push
+   ```
+
+3. Tag the commit with the version, but do not push the tag yet; push it
+   after the store publishes the version (see
+   [After the store publishes a version](#after-the-store-publishes-a-version)).
+   Run this in the top-level directory of the repository:
+
+   ```sh
+   VERSION=$(node -p 'require("./manifest.json").version')
+   git tag "v$VERSION"
    ```
 
 ### Build the package
 
 The store takes a ZIP file whose top level holds `manifest.json`.  The ZIP
 file should contain only the files that make up the extension (they are
-listed in the "Development" section of `README.md`):  not the tests,
-`node_modules/`, `package.json`, or `vendor/update.sh`.
+listed in the "Development" section of `README.md`) and the licenses:  not
+the tests, `node_modules/`, `package.json`, or `vendor/update.sh`.
 
-`git archive` builds the ZIP file from the committed files, so uncommitted
-changes and ignored files cannot get into it.  Run it in the top-level
-directory of the repository:
+`git archive` builds the ZIP file from the tagged commit, so uncommitted
+changes, later commits, and ignored files cannot get into it.  It omits the
+files that `.gitattributes` marks `export-ignore`.  When you add a file that
+is not part of the extension, mark it `export-ignore` in `.gitattributes`.
+Run this in the top-level directory of the repository:
 
 ```sh
 VERSION=$(node -p 'require("./manifest.json").version')
-git archive --format=zip -o "djot-viewer-$VERSION.zip" HEAD \
-  manifest.json background.js content.js content.css render.js LICENSE \
-  vendor ':!vendor/update.sh'
+git archive --format=zip -o "djot-viewer-$VERSION.zip" "v$VERSION"
 ```
 
 The `LICENSE` files of the vendored libraries are in the ZIP file, as their
 licenses require.
 
-Before uploading, unzip the file into a fresh directory, load that directory
-as an unpacked extension (see the "Installation" section of `README.md`),
-and check that a Djot file still renders, including its math, diagrams, and
-highlighted code.  This catches a file that the command omitted.
+Before uploading, check the ZIP file:
+
+1. List its contents (`unzip -l "djot-viewer-$VERSION.zip"`), and check that
+   it holds no file that is not part of the extension.
+2. In `chrome://extensions`, turn off your unpacked copy of the repository,
+   if you have one.  Otherwise, both copies run on each Djot page, and the
+   repository copy can hide a file that the ZIP file lacks.
+3. Unzip the file into a fresh directory, load that directory as an unpacked
+   extension (see the "Installation" section of `README.md`), and check that
+   a Djot file still renders, including its math, diagrams, and highlighted
+   code.
+4. Remove the extension that you loaded from the fresh directory, and turn
+   your repository copy back on.
 
 ### Upload the package
 
@@ -152,12 +174,16 @@ release, fill in every tab.
   (preferred) or 640x400 pixels, with square corners and no padding.  To
   make one, open a file from `test/`, such as `test/toc.djot` (it shows the
   table of contents) or `test/math.djot`, and open Chrome's DevTools.  Turn
-  on the device toolbar, set the dimensions to 1280x800, and choose "Capture
-  screenshot" from the device toolbar's menu.  Show both the light and the
-  dark appearance.
-- **Promo images:**  optional.  A small promo image is 440x280 pixels; a
-  marquee image is 1400x560 pixels.  The store lists an extension that has a
-  small promo image ahead of one that does not.
+  on the device toolbar, and set the dimensions to 1280x800.  In the device
+  toolbar's menu, choose "Add device pixel ratio", and set the device pixel
+  ratio to 1; otherwise, on a high-resolution display, the screenshot is
+  larger than 1280x800 pixels.  Then choose "Capture screenshot" from the
+  device toolbar's menu.  Show both the light and the dark appearance.
+- **Promo images:**  optional, according to
+  [Supplying images](https://developer.chrome.com/docs/webstore/images).  A
+  small promo image is 440x280 pixels; a marquee image is 1400x560 pixels.
+  The store lists an extension that has a small promo image ahead of one
+  that does not.
 - **Homepage URL:**  `https://github.com/mernst/djot-viewer`.
 - **Support URL:**  `https://github.com/mernst/djot-viewer/issues`.
 
@@ -203,16 +229,28 @@ after which the submission reverts to a draft.
 Expect the first review to take longer than later ones.  The dashboard warns
 that the extension's broad host permissions can require an in-depth review.
 Google sends email if the review rejects the extension, naming the policy
-that it violates; fix the problem, increase the version, and upload again.
+that it violates.  Delete the local tag, as in `git tag -d v0.2.0`, fix the
+problem, and start again at [Prepare the release](#prepare-the-release).  If
+the dashboard refuses the new package because of its version, increase the
+version.
 
-## After the first release
+## After the store publishes a version
 
-After the extension is published, update `README.md`:
+Push the version's tag.  Run this in the top-level directory of the
+repository:
+
+```sh
+VERSION=$(node -p 'require("./manifest.json").version')
+git push origin "v$VERSION"
+```
+
+After the first release, also update `README.md`:
 
 - In "Installation", describe installing the extension from its store page,
   and keep the instructions for loading it unpacked for developers.
-- In "Comparison with Markdown viewers", remove the bullet that says the
-  extension is not in the Chrome Web Store.
+- In "Comparison with Markdown viewers", replace the bullet that says the
+  extension is not in the Chrome Web Store by one that links to its store
+  page, as the section does for the two Markdown viewers.
 
 A published extension has a different extension ID from an unpacked copy of
 the repository, so Chrome treats them as two extensions.  A developer who has
