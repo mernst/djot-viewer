@@ -24,14 +24,16 @@ function byteString(buffer) {
   return result;
 }
 
+/** The URL of the extension's service worker, the only sender of requests. */
+const SERVICE_WORKER_URL = chrome.runtime.getURL("background.js");
+
 // Reply to a request from background.js with the current bytes of the file
 // whose file:// URL the message gives.  The reply is {bytes}, as from
-// byteString, on success, or {error} with a message.  Only the extension's
-// own pages and service worker can make this request; a content script's
-// message has a tab, so this ignores it, and a web page cannot use this to
-// read files.
+// byteString, on success, or {error} with a message.  This ignores a request
+// from any other sender, such as a content script, so that a page cannot use
+// this to read other files.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== "offscreen-read-file" || sender.tab || sender.id !== chrome.runtime.id) {
+  if (message?.type !== "offscreen-read-file" || sender.url !== SERVICE_WORKER_URL) {
     return false;
   }
   const url = message.url;

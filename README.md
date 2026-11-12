@@ -113,9 +113,11 @@ libraries.
 - `content.js` is the Chrome-specific part:  it decides whether to render the
   page, reads the file's text from the page, loads libraries, renders
   Mermaid diagrams, and renders the page again when a local file changes.
-- `background.js` is the extension's service worker.  It rereads a local
-  file for `content.js`, which checks whether the file has changed; Chrome
-  does not let a content script read a `file://` URL.
+- `background.js` is the extension's service worker.  It gets the current
+  bytes of a local file for `content.js`, which checks whether the file has
+  changed; Chrome does not let a content script read a `file://` URL.
+  `background.js` asks the offscreen document for the bytes, and closes that
+  document when no Djot page has asked for a while.
 - `offscreen.html` and `offscreen.js` make up an invisible extension page
   that does the reading for `background.js`.  A service worker's read of a
   `file://` URL sometimes fails, especially after Chrome stops the idle
