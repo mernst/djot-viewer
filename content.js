@@ -323,7 +323,9 @@
       // Any other reply is a failure.  Treating it as the file's bytes would
       // show an empty document.
       if (typeof reply?.bytes !== "string") {
-        throw new Error(reply?.error ?? `unexpected reply from background.js: ${JSON.stringify(reply)}`);
+        throw new Error(
+          reply?.error ?? `unexpected reply from background.js: ${JSON.stringify(reply)}`,
+        );
       }
       return reply.bytes;
     }
