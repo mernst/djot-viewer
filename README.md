@@ -121,6 +121,9 @@ libraries.
   `vendor/update.sh`, which downloads them (see
   [Vendored libraries](#vendored-libraries)).
 
+To publish a new version in the Chrome Web Store, see
+[docs/publishing-chrome-web-store.md](docs/publishing-chrome-web-store.md).
+
 ### Tests
 
 The tests run `render.js` in [Node](https://nodejs.org/) with
