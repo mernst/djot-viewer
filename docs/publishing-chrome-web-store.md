@@ -62,20 +62,24 @@ extension currently has none.  Before the first upload:
 
 The store asks for a privacy policy URL.  Djot Viewer collects no user data
 and sends nothing off the user's computer, so a short policy that says so is
-enough.  For example, commit a file `PRIVACY.md` that says:
+enough.  For example, commit a file `docs/PRIVACY.md` (in `docs/`, so that
+`git archive` leaves it out of the package) that says:
 
 > Djot Viewer does not collect, store, or transmit any data.  It reads the
-> text of a page whose URL ends in `.djot`, `.dj`, `.DJOT`, or `.DJ`, and
-> renders it in the same tab.  For a local file, or a file on a web server on
-> the user's own computer (`localhost`, `127.0.0.1`, or `[::1]`), the
-> extension rereads the file about once a second while the tab is visible,
-> to detect changes.  It rereads a local file from disk, and it requests a
-> file on `localhost` again from the same server.  The file's contents never
-> leave the user's computer.
+> text of a page whose URL ends in `.djot`, `.dj`, `.DJOT`, or `.DJ`
+> (optionally followed by a query string), and renders it in the same tab.
+> For a local file, or a file on a web server on the user's own computer
+> (`localhost`, `127.0.0.1`, or `[::1]`), the extension rereads the file
+> about once a second while the tab is visible, to detect changes.  It
+> rereads a local file from disk, and it requests a file on `localhost` again
+> from the same server.  The file's contents never leave the user's
+> computer.  As on any web page, the browser loads the images and other
+> resources that a rendered document refers to, which can be on other
+> servers.
 
 Then use the file's GitHub URL, such as
-`https://github.com/mernst/djot-viewer/blob/main/PRIVACY.md`, as the privacy
-policy URL.
+`https://github.com/mernst/djot-viewer/blob/main/docs/PRIVACY.md`, as the
+privacy policy URL.
 
 ## Publishing a version
 
@@ -189,15 +193,16 @@ release, fill in every tab.
 
 #### Privacy
 
-- **Single purpose:**  for example, "Displays Djot files (`.djot`, `.dj`)
-  as formatted HTML in the tab that shows the file."
+- **Single purpose:**  for example, "Displays Djot files (`.djot`, `.dj`,
+  `.DJOT`, `.DJ`) as formatted HTML in the tab that shows the file."
 - **Permission justification:**  The extension requests no `permissions`,
   but its content script's match patterns, such as `*://*/*.djot`, count as
   host permissions.  Justify them, for example:  "The content script must
   run on any site that serves a Djot file, such as
   `raw.githubusercontent.com`, and on local files.  Its match patterns
-  restrict it to URLs whose path ends in `.djot`, `.dj`, `.DJOT`, or `.DJ`,
-  and it changes only a page that the browser shows as plain text."
+  restrict it to URLs whose path ends in `.djot`, `.dj`, `.DJOT`, or `.DJ`
+  (optionally followed by a query string), and it changes only a page that
+  the browser shows as plain text."
 - **Remote code:**  "No, I am not using remote code."  Every library is in
   `vendor/`, and the extension loads Temml, highlight.js, and Mermaid from
   its own package.
@@ -213,11 +218,14 @@ release, fill in every tab.
 
 #### Test instructions
 
-Reviewers need a Djot file to try.  For example:  "Open
+Reviewers need Djot files to try, including ones that exercise the bundled
+libraries for math, diagrams, and highlighted code.  For example:  "Open
 `https://raw.githubusercontent.com/mernst/djot-viewer/main/test/basic.djot`.
-The extension renders it as HTML.  To try a local file, download that file,
-turn on 'Allow access to file URLs' in the extension's details, and open
-the file."
+The extension renders it as HTML.  Also open `test/math.djot`,
+`test/diagrams.djot`, and `test/highlight.djot` from the same directory,
+which show math, Mermaid diagrams, and highlighted code.  To try a local
+file, download one of those files, turn on 'Allow access to file URLs' in
+the extension's details, and open the file."
 
 ### Submit for review
 
@@ -229,10 +237,16 @@ after which the submission reverts to a draft.
 Expect the first review to take longer than later ones.  The dashboard warns
 that the extension's broad host permissions can require an in-depth review.
 Google sends email if the review rejects the extension, naming the policy
-that it violates.  Delete the local tag, as in `git tag -d v0.2.0`, fix the
-problem, and start again at [Prepare the release](#prepare-the-release).  If
-the dashboard refuses the new package because of its version, increase the
-version.
+that it violates.  To submit a fix:
+
+1. Delete the local tag, as in `git tag -d v0.2.0`.
+2. Fix the problem, and commit and push the fix.
+3. Do steps 1 and 3 of [Prepare the release](#prepare-the-release), but not
+   step 2:  keep the version that the rejected package has.
+4. Continue with [Build the package](#build-the-package).  If the dashboard
+   refuses the new package because of its version, delete the tag, increase
+   the version as in step 2 of [Prepare the release](#prepare-the-release),
+   tag again, and build again.
 
 ## After the store publishes a version
 
