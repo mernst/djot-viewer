@@ -1,0 +1,17 @@
+<html class="djot-viewer"><head><meta name="color-scheme" content="light dark"><title>Highlighting</title></head><body><main class="djot"><section id="Highlighting">
+<h1>Highlighting</h1>
+<p>A known language:</p>
+<pre><code class="language-python hljs"><span class="hljs-keyword">def</span> <span class="hljs-title function_">greet</span>(<span class="hljs-params">name</span>):
+    <span class="hljs-keyword">return</span> <span class="hljs-string">f"Hello, <span class="hljs-subst">{name}</span> &lt;&amp;&gt;"</span>
+</code></pre>
+<p>An unknown language:</p>
+<pre><code class="language-nosuchlang">some &lt;code&gt; &amp; text
+</code></pre>
+<p>No language:</p>
+<pre><code>plain &lt;code&gt; &amp; text
+</code></pre>
+<p>A Mermaid block, which render.js leaves for content.js:</p>
+<pre><code class="language-mermaid">graph TD; A--&gt;B
+</code></pre>
+</section>
+</main></body></html>

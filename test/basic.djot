@@ -1,0 +1,29 @@
+# Basic document[^title]
+
+This paragraph has _emphasis_, *strong text*, `inline code`, a
+[relative link](other.djot), an [absolute link](https://djot.net/), and a
+footnote.[^note]
+
+## Lists and quotes
+
+- One
+- Two
+
+  1. Nested
+  2. List
+
+> A block quote.
+
+## Tables
+
+| Name  | Value |
+|-------|------:|
+| alpha |     1 |
+| beta  |    22 |
+
+### A third-level heading
+
+Text.
+
+[^title]: A footnote in the title, which the tab title omits.
+[^note]: The footnote's text.

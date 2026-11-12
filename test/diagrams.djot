@@ -1,0 +1,32 @@
+# Diagrams
+
+A flowchart:
+
+``` mermaid
+graph LR
+  A[Start] --> B{Choice}
+  B -->|yes| C[One]
+  B -->|no| D[Other]
+```
+
+A sequence diagram:
+
+``` mermaid
+sequenceDiagram
+  Alice->>Bob: Hello
+  Bob-->>Alice: Hi
+```
+
+A diagram with a syntax error:
+
+``` mermaid
+graph LR
+  A -->
+```
+
+A diagram whose label contains HTML, whose onerror handler must not run:
+
+``` mermaid
+graph LR
+  A["<img src=x onerror=alert(1)>"] --> B
+```

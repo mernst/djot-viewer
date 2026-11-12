@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "Djot Viewer",
+  "version": "0.1.0",
+  "description": "Renders Djot files (.djot, .dj) as HTML, with math, diagrams, syntax highlighting, and a table of contents.",
+  "minimum_chrome_version": "120",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "file:///*.djot",
+        "file:///*.djot?*",
+        "*://*/*.djot",
+        "*://*/*.djot?*",
+        "file:///*.dj",
+        "file:///*.dj?*",
+        "*://*/*.dj",
+        "*://*/*.dj?*",
+        "file:///*.DJOT",
+        "file:///*.DJOT?*",
+        "*://*/*.DJOT",
+        "*://*/*.DJOT?*",
+        "file:///*.DJ",
+        "file:///*.DJ?*",
+        "*://*/*.DJ",
+        "*://*/*.DJ?*"
+      ],
+      "js": [
+        "vendor/djot/djot.js",
+        "vendor/dompurify/purify.min.js",
+        "render.js",
+        "content.js"
+      ],
+      "css": [
+        "vendor/temml/temml.css",
+        "vendor/highlight.js/highlight.css",
+        "content.css"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "vendor/temml/temml.mjs",
+        "vendor/highlight.js/highlight.min.js",
+        "vendor/mermaid/*.mjs",
+        "vendor/mermaid/chunks/mermaid.esm.min/*.mjs"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}
