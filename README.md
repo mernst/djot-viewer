@@ -104,8 +104,8 @@ For example, `python3 -m http.server` sends `application/octet-stream` for
 ## Development
 
 These are all the files that make up the extension.  The repository's other
-files are documentation, licenses, tests, and the script that updates the
-libraries.
+files are documentation, licenses, tests, the script that updates the
+libraries, and the source of the icons with the script that generates them.
 
 - `manifest.json` tells Chrome which pages the extension runs on, and which
   scripts and stylesheets to inject into them.
@@ -124,9 +124,16 @@ libraries.
   `file://` URL sometimes fails, especially after Chrome stops the idle
   service worker and starts it again.
 - `content.css` styles a rendered page.
+- `icons/icon-16.png` through `icons/icon-128.png` are the extension's icons,
+  which Chrome shows on `chrome://extensions`, in the toolbar, and in the
+  Chrome Web Store.  `icons/make-icons.sh` generates them from
+  `icons/icon.svg`; neither of those two files is part of the extension.
 - `vendor/` holds the libraries that the scripts use, except
   `vendor/update.sh`, which downloads them (see
   [Vendored libraries](#vendored-libraries)).
+
+To publish a new version in the Chrome Web Store, see
+[docs/publishing-chrome-web-store.md](docs/publishing-chrome-web-store.md).
 
 ### Tests
 

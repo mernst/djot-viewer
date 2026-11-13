@@ -1,0 +1,15 @@
+# `git archive` omits these files, which are not part of the extension, from
+# the package for the Chrome Web Store.  See
+# docs/publishing-chrome-web-store.md.  The leading "/" makes each pattern
+# match only at the top level, not inside `vendor/`.
+/.gitattributes export-ignore
+/.github export-ignore
+/.gitignore export-ignore
+/README.md export-ignore
+/docs export-ignore
+/icons/icon.svg export-ignore
+/icons/make-icons.sh export-ignore
+/package.json export-ignore
+/package-lock.json export-ignore
+/test export-ignore
+/vendor/update.sh export-ignore
