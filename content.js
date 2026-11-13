@@ -300,8 +300,8 @@
 
   /**
    * The bytes of a version of the page's file:  for a file:// page, a string
-   * with one character (U+0000 to U+00FF) per byte, as background.js sends
-   * them; otherwise, a Uint8Array.
+   * with one character (U+0000 to U+00FF) per byte, as background.js passes
+   * them on from the offscreen document; otherwise, a Uint8Array.
    *
    * @typedef {string|Uint8Array} FileBytes
    */
@@ -312,15 +312,20 @@
    * @returns {Promise<FileBytes|null>} a promise of the file's bytes, or of
    *     null if the server responded with an error status, such as 404 for a
    *     deleted file
-   * @throws {Error} if the file cannot be read at all
+   * @throws {Error} if the file cannot be read at all, or if background.js
+   *     does not reply with the bytes of a file:// page's file
    */
   async function fetchBytes() {
     if (location.protocol === "file:") {
-      // Chrome blocks a fetch from a file:// page, so background.js reads the
-      // file.
+      // Chrome blocks a fetch from a file:// page, so background.js gets the
+      // file's bytes, from the offscreen document (offscreen.js).
       const reply = await chrome.runtime.sendMessage({ type: "read-file" });
-      if (reply.error !== undefined) {
-        throw new Error(reply.error);
+      // Any other reply is a failure.  Treating it as the file's bytes would
+      // show an empty document.
+      if (typeof reply?.bytes !== "string") {
+        throw new Error(
+          reply?.error ?? `unexpected reply from background.js: ${JSON.stringify(reply)}`,
+        );
       }
       return reply.bytes;
     }
@@ -452,6 +457,7 @@
     // load.  As each diagram appears, Chrome's scroll anchoring keeps the
     // visible text in place.
     djotViewer.show(document, rendering);
+    djotViewer.addIcon(document);
     fitTocToWindow();
     scrollToFragment();
     wideWindow.addEventListener("change", fitTocToWindow);
