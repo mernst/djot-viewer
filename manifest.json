@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "description": "Renders Djot files (.djot, .dj) as HTML, with math, diagrams, syntax highlighting, and a table of contents.",
   "minimum_chrome_version": "120",
+  "permissions": [
+    "offscreen"
+  ],
   "background": {
     "service_worker": "background.js"
   },
