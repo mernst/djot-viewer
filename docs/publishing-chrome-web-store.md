@@ -34,53 +34,6 @@ change from time to time:
 A new publisher can have at most two published extensions, according to
 [Publish in the Chrome Web Store](https://developer.chrome.com/docs/webstore/publish).
 
-### Add icons to the extension
-
-The store requires a 128x128 PNG icon inside the uploaded package, and the
-extension currently has none.  Before the first upload:
-
-1. Create an icon:  96x96 pixels of artwork, centered in a 128x128 PNG with
-   16 pixels of transparent padding on each side.  Also make 16x16, 32x32,
-   and 48x48 versions, which Chrome uses on `chrome://extensions` and in the
-   toolbar.
-2. Commit them, for example as `icons/icon-16.png` through
-   `icons/icon-128.png`, and add them to `manifest.json`:
-
-   ```json
-   "icons": {
-     "16": "icons/icon-16.png",
-     "32": "icons/icon-32.png",
-     "48": "icons/icon-48.png",
-     "128": "icons/icon-128.png"
-   },
-   ```
-
-3. Add a bullet for the icons to the list of files in the "Development"
-   section of `README.md`.
-
-### Write a privacy policy
-
-The store asks for a privacy policy URL.  Djot Viewer collects no user data
-and sends nothing off the user's computer, so a short policy that says so is
-enough.  For example, commit a file `docs/PRIVACY.md` (in `docs/`, so that
-`git archive` leaves it out of the package) that says:
-
-> Djot Viewer does not collect, store, or transmit any data.  It reads the
-> text of a page whose URL ends in `.djot`, `.dj`, `.DJOT`, or `.DJ`
-> (optionally followed by a query string), and renders it in the same tab.
-> For a local file, or a file on a web server on the user's own computer
-> (`localhost`, `127.0.0.1`, or `[::1]`), the extension rereads the file
-> about once a second while the tab is visible, to detect changes.  It
-> rereads a local file from disk, and it requests a file on `localhost` again
-> from the same server.  The file's contents never leave the user's
-> computer.  As on any web page, the browser loads the images and other
-> resources that a rendered document refers to, which can be on other
-> servers.
-
-Then use the file's GitHub URL, such as
-`https://github.com/mernst/djot-viewer/blob/main/docs/PRIVACY.md`, as the
-privacy policy URL.
-
 ## Publishing a version
 
 Do these steps for the first release and for every later one.
@@ -173,7 +126,9 @@ release, fill in every tab.
   warning when they install the extension.
 - **Category:**  "Developer Tools" or "Productivity".
 - **Language:**  English.
-- **Store icon:**  the 128x128 icon from [Add icons to the extension](#add-icons-to-the-extension).
+- **Store icon:**  `icons/icon-128.png`.  It is also in the package, where
+  the store requires a 128x128 icon:  96x96 pixels of artwork, centered with
+  16 pixels of transparent padding on each side.
 - **Screenshots:**  at least one, and up to five, each 1280x800 pixels
   (preferred) or 640x400 pixels, with square corners and no padding.  To
   make one, open a file from `test/`, such as `test/toc.djot` (it shows the
@@ -195,19 +150,30 @@ release, fill in every tab.
 
 - **Single purpose:**  for example, "Displays Djot files (`.djot`, `.dj`,
   `.DJOT`, `.DJ`) as formatted HTML in the tab that shows the file."
-- **Permission justification:**  The extension requests no `permissions`,
-  but its content script's match patterns, such as `*://*/*.djot`, count as
-  host permissions.  Justify them, for example:  "The content script must
-  run on any site that serves a Djot file, such as
-  `raw.githubusercontent.com`, and on local files.  Its match patterns
-  restrict it to URLs whose path ends in `.djot`, `.dj`, `.DJOT`, or `.DJ`
-  (optionally followed by a query string), and it changes only a page that
-  the browser shows as plain text."
+- **Permission justification:**  The dashboard asks for a justification of
+  each permission in `manifest.json`.  The only entry in its `permissions`
+  is `offscreen`.  In addition, the content script's match patterns, such as
+  `*://*/*.djot`, count as host permissions.  Justify both, for example:
+  - `offscreen`:  "To detect changes to a local Djot file that a tab shows,
+    the extension rereads the file about once a second.  A content script
+    cannot read a `file://` URL, and a read from the service worker
+    sometimes fails after Chrome restarts the service worker, so an
+    offscreen document reads the file.  The document reads only the file
+    that the tab shows, and the extension closes the document when no Djot
+    page has asked for a while."
+  - Host permissions:  "The content script must run on any site that serves
+    a Djot file, such as `raw.githubusercontent.com`, and on local files.
+    Its match patterns restrict it to URLs whose path ends in `.djot`,
+    `.dj`, `.DJOT`, or `.DJ` (optionally followed by a query string), and it
+    changes only a page that the browser shows as plain text."
 - **Remote code:**  "No, I am not using remote code."  Every library is in
   `vendor/`, and the extension loads Temml, highlight.js, and Mermaid from
   its own package.
 - **Data usage:**  check no data types, and check the certifications.
-- **Privacy policy:**  the URL from [Write a privacy policy](#write-a-privacy-policy).
+- **Privacy policy:**
+  `https://github.com/mernst/djot-viewer/blob/main/docs/PRIVACY.md`.  If a
+  release changes what the extension reads, or where it sends anything,
+  update `docs/PRIVACY.md` first.
 
 #### Distribution
 
